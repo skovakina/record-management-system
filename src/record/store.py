@@ -1,9 +1,4 @@
-"""The shared records store.
-
-Per the brief, all records live in a single list of dictionaries. ``RecordStore``
-owns that list and knows how to load it from / save it to the JSONL file. Record
-types (Client, Airline, Flight) add their records to this same shared list.
-"""
+"""The shared records store: one list of record dicts, persisted as JSONL."""
 
 from record import storage
 from record.flight import create_flight_record
@@ -14,16 +9,15 @@ class RecordStore:
 
     def __init__(self, path=storage.DEFAULT_PATH):
         self.path = path
-        # The shared list of record dictionaries (records: list = [{}, {}]).
         self.records = []
 
     def load(self):
-        """Load records from disk into the shared list (called at startup)."""
+        """Load records from disk into the shared list."""
         self.records = storage.load_records(self.path)
         return self.records
 
     def save(self):
-        """Persist the shared list to disk (called when the app closes)."""
+        """Persist the shared list to disk."""
         storage.save_records(self.records, self.path)
 
     def add_flight(self, client_id, airline_id, date, start_city, end_city):

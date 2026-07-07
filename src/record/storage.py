@@ -9,8 +9,7 @@ import os
 
 import jsonlines
 
-# Default location of the records file, resolved relative to this module so it
-# works regardless of the current working directory.
+# Resolved relative to this module so it works from any working directory.
 DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "record.jsonl")
 
 
