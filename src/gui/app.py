@@ -1,14 +1,8 @@
-"""Main application window for the Record Management System.
+"""Main window for the Record Management System.
 
-This module builds the GUI *shell*: the layout, navigation between the three
-record sections (Clients, Airlines, Flights), and the view/edit/new controls.
-
-Scope note: nothing here is wired to real persistence yet. Buttons call handler
-methods so the flow is in place, but those handlers only manipulate the GUI (or
-are ``# TODO`` stubs) -- they do not read from or write to the JSONL store. The
-field definitions and sample rows below stand in for the record modules
-(``record.client`` / ``record.airline`` / ``record.flight``) and will be sourced
-from them once the data layer is integrated.
+GUI shell only: layout, section navigation and the view/edit/new controls.
+Not wired to persistence yet -- save/load are ``# TODO`` stubs and records are
+held in memory (see ``RecordManagerApp.section_records``).
 """
 
 import calendar
@@ -17,38 +11,22 @@ import datetime
 import tkinter as tk
 from tkinter import ttk
 
-# Border colours for the detail fields. Each field widget sits inside a thin
-# wrapper frame whose background acts as the border; recolouring that frame
-# flags a required-but-empty field in red. The wrapper approach means the same
-# validation cue works for both Entry and Combobox fields (ttk widgets can't be
-# given a coloured border directly). tkinter has no rounded-corner support, so
-# the cue is a red border rather than a red rounded outline -- rounded corners
-# would need customtkinter or hand-drawn Canvas fields, avoided to stay
-# dependency-free.
+# Each detail field sits in a wrapper frame whose background acts as its border,
+# so the red required-field cue works for both Entry and Combobox (ttk widgets
+# can't take a coloured border directly, and tkinter has no rounded corners).
 BORDER_NORMAL = "#cccccc"
 BORDER_ERROR = "#d13438"
 
-# Sort-direction glyphs shown in a sortable column header. Only the active
-# column shows an arrow; inactive columns show just the field name.
-SORT_ASCENDING = "▲"   # up
-SORT_DESCENDING = "▼"  # down
+# Arrow shown on the active sort column only; inactive columns show no arrow.
+SORT_ASCENDING = "▲"
+SORT_DESCENDING = "▼"
 
-# ---------------------------------------------------------------------------
-# Section definitions.
-#
-# Each section mirrors a record type from the brief. ``fields`` is the ordered
-# list of field names shown in the detail panel (these match the record
-# modules' FIELDS tuples). ``auto`` lists fields the system assigns (ID, Type)
-# which are always read-only. ``required`` lists the fields the user must fill
-# before a record can be saved. ``list_fields`` are the columns summarised in
-# the middle list. Records themselves are held in memory (see
-# RecordManagerApp.section_records) and start empty until the data layer is
-# wired to load them from the JSONL store.
-# ---------------------------------------------------------------------------
+# Per-section config. Keys: fields (detail order), auto (system-set, read-only),
+# required (must be filled), list_fields (list columns), plus colour, sortable,
+# search_hint and (Flights) references / datetime_field.
 SECTIONS = {
     "Clients": {
         "singular": "Client",
-        # Pastel accent: shown as the button swatch and the panel tint.
         "color": "#DCE9F7",  # powder blue
         "fields": [
             "ID",
@@ -63,7 +41,6 @@ SECTIONS = {
             "Country",
             "Phone Number",
         ],
-        # ID and Type are assigned by the system, never typed by the user.
         "auto": ["ID", "Type"],
         "required": [
             "Name",
@@ -75,14 +52,13 @@ SECTIONS = {
             "Phone Number",
         ],
         "list_fields": ["ID", "Name"],
-        "sortable": True,  # Clickable, sortable column headers.
+        "sortable": True,
         "search_hint": "Search Client name",
     },
     "Airlines": {
         "singular": "Airline",
         "color": "#DDEFE0",  # mint green
         "fields": ["ID", "Type", "Company Name"],
-        # ID and Type are assigned by the system, never typed by the user.
         "auto": ["ID", "Type"],
         "required": ["Company Name"],
         "list_fields": ["ID", "Company Name"],
@@ -93,14 +69,10 @@ SECTIONS = {
         "singular": "Flight",
         "color": "#F6E7CE",  # warm sand
         "fields": ["Client_ID", "Airline_ID", "Date", "Start City", "End City"],
-        # Flights have no system-assigned ID of their own; the two link IDs are
-        # chosen by the user (they reference existing Client/Airline records).
-        "auto": [],
-        # Every Flight field is required -- there are no optional ones.
+        "auto": [],  # Flights have no system ID; the link IDs are user-chosen.
         "required": ["Client_ID", "Airline_ID", "Date", "Start City", "End City"],
-        # Reference fields: shown as dropdowns of human-readable names from
-        # another section, but stored as that section's ID. ``label`` renames
-        # the field in the UI (Client_ID -> "Client"); the data key is unchanged.
+        # Shown as name dropdowns but stored as the referenced section's ID;
+        # ``label`` renames the field in the UI.
         "references": {
             "Client_ID": {"section": "Clients", "display": "Name", "label": "Client"},
             "Airline_ID": {
@@ -109,14 +81,10 @@ SECTIONS = {
                 "label": "Airline",
             },
         },
-        # Composite field: the stored "Date" (ISO 8601 string) is entered via
-        # separate Year/Month/Day dropdowns and 24-hour HH:MM boxes, then
-        # reassembled on save. The record's data structure is unchanged.
+        # "Date" is entered as Y/M/D + HH:MM and reassembled into a stored ISO string.
         "datetime_field": "Date",
         "list_fields": ["Client_ID", "Airline_ID", "Date"],
-        # All three list columns are sortable, including Date (ISO strings sort
-        # chronologically).
-        "sortable": True,
+        "sortable": True,  # Date sorts chronologically as an ISO string.
         "search_hint": "Search company or client name",
     },
 }
@@ -125,18 +93,13 @@ SECTION_ORDER = ["Clients", "Airlines", "Flights"]
 
 
 def _darken(hex_color, factor):
-    """Return ``hex_color`` scaled toward black by ``factor`` (0..1).
-
-    Used to derive the hover/pressed shades of a button's pastel base colour.
-    """
+    """Return ``hex_color`` scaled toward black by ``factor`` (0..1)."""
     value = hex_color.lstrip("#")
     r, g, b = (int(value[i:i + 2], 16) for i in (0, 2, 4))
     r, g, b = (int(c * factor) for c in (r, g, b))
     return f"#{r:02x}{g:02x}{b:02x}"
 
-# Proportional widths of the three columns (sidebar | list | details). Kept as
-# grid weights with a shared uniform group so the panels hold these ratios as
-# the window is resized, rather than one column absorbing all the extra space.
+# Proportional widths (sidebar | list | detail), held on resize via uniform.
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
 
 
@@ -149,54 +112,35 @@ class RecordManagerApp(tk.Tk):
         self.geometry("960x560")
         self.minsize(820, 460)
 
-        # Currently selected section (e.g. "Clients") and the record dict the
-        # detail panel is showing. The detail entry widgets are kept keyed by
-        # field name so we can read/populate them and toggle their state.
         self.current_section = None
-        # In-memory records per section, empty until wired to the JSONL store.
-        # (New/Save would append here; load would replace these lists.)
+        # Records per section, held in memory (empty until persistence is wired).
         self.section_records = {name: [] for name in SECTIONS}
         self.current_records = []
-        # The records currently visible in the list (== current_records unless a
-        # search has filtered it). List selection is mapped back through this.
+        # Rows currently shown (differs from current_records when a search filters).
         self.displayed_records = []
-        # field -> (widget, var, border): widget is an Entry or Combobox, var
-        # holds its shown text, border is the wrapper frame used for the red
-        # required-field cue.
+        # field -> (widget, var, border_frame).
         self.detail_entries = {}
-        # field -> {"to_id": {display: id}, "to_display": {id: display}} for the
-        # Flight reference dropdowns (Client_ID/Airline_ID).
+        # field -> {"to_id": {name: id}, "to_display": {id: name}} for Flight dropdowns.
         self.ref_index = {}
-        # Required-field labels whose trailing "*" is shown only while the field
-        # is flagged red. field -> (label_widget, base_text) for normal fields;
-        # {"date"/"time": (label_widget, base_text)} for the composite field.
+        # Required-field labels, so the trailing "*" tracks the red border.
         self.detail_labels = {}
         self.dt_labels = {}
-        # part-name -> (widget, var, border) for the composite Date/Time field
-        # (keys: year, month, day, hour, minute). Empty for non-Flight sections.
+        # Composite date/time parts: part -> (widget, var, border). Empty off Flights.
         self.dt = {}
-        # Whether the detail panel is currently showing a selected record (vs
-        # blank). The Edit button only appears when a record is shown.
+        # A record is shown (vs blank); the Edit button only appears when one is.
         self._record_shown = False
-        # Current sort for sortable sections: which list_field, ascending or not.
         self.sort_field = None
         self.sort_ascending = True
-        # Pending debounced search job id (from ``after``), or None.
-        self._search_job = None
-        # Placeholder (hint) state for the search box: the current hint text and
-        # whether the box is currently showing it (rather than a real query).
+        self._search_job = None  # pending debounced search (after id), or None
         self._search_hint = ""
         self._placeholder_active = False
         self.editing = False
 
         self._build_title_bar()
         self._build_body()
-
-        # Route the window-close (X) button through our own handler so the
-        # app has a single, well-defined shutdown path.
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Start on the welcome panel; it is dismissed on the first selection.
+        # Start on the welcome panel; dismissed on the first selection.
         self._show_welcome()
 
     # -- Layout construction ------------------------------------------------
@@ -218,7 +162,6 @@ class RecordManagerApp(tk.Tk):
         body = ttk.Frame(self)
         body.pack(side="top", fill="both", expand=True)
 
-        # Proportional columns via grid weights sharing one uniform group.
         body.columnconfigure(0, weight=COLUMN_WEIGHTS["sidebar"], uniform="cols")
         body.columnconfigure(1, weight=COLUMN_WEIGHTS["list"], uniform="cols")
         body.columnconfigure(2, weight=COLUMN_WEIGHTS["detail"], uniform="cols")
@@ -230,7 +173,7 @@ class RecordManagerApp(tk.Tk):
         self._build_welcome(body)
 
     def _build_sidebar(self, parent):
-        """Left column: 'Travel Records' header, section buttons, auto-save hint."""
+        """Left column: header, coloured section buttons, auto-save hint."""
         sidebar = ttk.Frame(parent, padding=10)
         sidebar.grid(row=0, column=0, sticky="nsew")
 
@@ -238,10 +181,9 @@ class RecordManagerApp(tk.Tk):
             sidebar, text="Travel Records", font=("Segoe UI", 11, "bold")
         ).pack(side="top", anchor="w", pady=(0, 8))
 
-        # Nav buttons carry their section's pastel colour, with darker hover and
-        # pressed shades. Classic tk.Button is used (not ttk) because the Windows
-        # ttk theme ignores button background; tk.Button honours bg directly and
-        # lets us drive hover/press states via bindings.
+        # Classic tk.Button (not ttk): the Windows ttk theme ignores button bg,
+        # but tk.Button honours it, so each button and its hover/press states
+        # can carry the section colour.
         self.nav_buttons = {}
         for name in SECTION_ORDER:
             base = SECTIONS[name]["color"]
@@ -261,16 +203,13 @@ class RecordManagerApp(tk.Tk):
                 cursor="hand2",
                 command=lambda n=name: self.select_section(n),
             )
-            # ipady sets button height; pady is the gap between buttons.
             btn.pack(side="top", fill="x", pady=2, ipady=8)
-            # Hover and press feedback (base -> hover -> pressed -> hover).
             btn.bind("<Enter>", lambda e, b=btn, c=hover: b.configure(bg=c))
             btn.bind("<Leave>", lambda e, b=btn, c=base: b.configure(bg=c))
             btn.bind("<ButtonPress-1>", lambda e, b=btn, c=pressed: b.configure(bg=c))
             btn.bind("<ButtonRelease-1>", lambda e, b=btn, c=hover: b.configure(bg=c))
             self.nav_buttons[name] = btn
 
-        # Greyed-out reassurance that closing the app is safe -- it saves.
         ttk.Label(
             sidebar,
             text="Data auto-saves on exit",
@@ -287,25 +226,22 @@ class RecordManagerApp(tk.Tk):
         self.list_header = ttk.Label(middle, text="", font=("Segoe UI", 12, "bold"))
         self.list_header.pack(side="top", anchor="w", pady=(0, 6))
 
-        # Search row sits directly above the list it filters. The list updates
-        # as you type (debounced); Clear resets the box and the filter.
+        # The list filters live as you type (debounced); Clear resets it.
         search_row = ttk.Frame(middle)
         search_row.pack(side="top", fill="x", pady=(0, 6))
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *_: self._schedule_search())
         self.search_entry = ttk.Entry(search_row, textvariable=self.search_var)
         self.search_entry.pack(side="left", fill="x", expand=True)
-        # Default text colour, so the placeholder can go grey and back.
-        self._search_fg = self.search_entry.cget("foreground")
+        self._search_fg = self.search_entry.cget("foreground")  # default, for placeholder
         self.search_entry.bind("<FocusIn>", self._on_search_focus_in)
         self.search_entry.bind("<FocusOut>", self._on_search_focus_out)
         ttk.Button(search_row, text="Clear", command=self.on_clear_search).pack(
             side="left", padx=(6, 0)
         )
 
-        # The entry list, as a Treeview so it can show column headings for the
-        # fields being displayed. Columns are (re)configured per section in
-        # _populate_list. Selecting a row loads it into the detail panel.
+        # Treeview so the list can show column headings; columns are set per
+        # section in _populate_list.
         list_wrap = ttk.Frame(middle)
         list_wrap.pack(side="top", fill="both", expand=True)
         self.tree = ttk.Treeview(list_wrap, show="headings", selectmode="browse")
@@ -326,21 +262,16 @@ class RecordManagerApp(tk.Tk):
             side="top", anchor="w", pady=(0, 6)
         )
 
-        # Fields get rebuilt whenever the section changes.
         self.fields_frame = ttk.Frame(right)
         self.fields_frame.pack(side="top", fill="both", expand=True)
 
-        # Hint for the composite time entry. Shown only while editing/creating a
-        # Flight (see _set_editing), sitting just above the required-field legend.
+        # time_hint and required_legend are shown only while editing (_set_editing).
         self.time_hint = ttk.Label(
             right,
             text="Time uses the 24-hour clock (HH 00-23, MM 00-59)",
             foreground="grey",
             font=("Segoe UI", 8),
         )
-
-        # Legend explaining the asterisk / red border on required fields. Only
-        # shown while editing or creating a record (see _set_editing).
         self.required_legend = ttk.Label(
             right,
             text="*  Required field",
@@ -348,8 +279,6 @@ class RecordManagerApp(tk.Tk):
             font=("Segoe UI", 8),
         )
 
-        # Button row. Edit is shown by default; Save/Cancel are hidden until
-        # editing starts. New is always visible and renamed per section.
         buttons = ttk.Frame(right)
         buttons.pack(side="bottom", fill="x", pady=(8, 0))
 
@@ -367,11 +296,10 @@ class RecordManagerApp(tk.Tk):
     def _build_welcome(self, parent):
         """Welcome panel shown on launch, covering the list + detail columns.
 
-        It is dismissed the first time the user picks a section (see
-        select_section) and does not return for the rest of the session.
+        Dismissed the first time the user picks a section (see select_section)
+        and does not return for the rest of the session.
         """
-        # Team credits, sorted by surname ("Lastname, Firstname").
-        credits = [
+        credits = [  # sorted by surname
             "Kovakina, Svetlana",
             "Mekwunye, Victor",
             "Nguyen, Khanh Ngoc",
@@ -382,7 +310,6 @@ class RecordManagerApp(tk.Tk):
         self.welcome_panel = ttk.Frame(parent, padding=20)
         self.welcome_panel.grid(row=0, column=1, columnspan=2, sticky="nsew")
 
-        # Centred welcome message.
         message_area = ttk.Frame(self.welcome_panel)
         message_area.pack(side="top", fill="both", expand=True)
         centred = ttk.Frame(message_area)
@@ -401,7 +328,6 @@ class RecordManagerApp(tk.Tk):
             justify="center",
         ).pack(pady=(8, 0))
 
-        # Credits footer.
         ttk.Label(
             self.welcome_panel,
             text="Credits: " + "  •  ".join(credits),
@@ -426,13 +352,10 @@ class RecordManagerApp(tk.Tk):
     # -- Detail field rendering --------------------------------------------
 
     def _build_ref_index(self, section):
-        """Build display<->id maps for the section's reference (dropdown) fields.
+        """Map each reference field's IDs to display names and back.
 
-        For each reference field (e.g. Flight's Client_ID) this reads the target
-        section's records and maps each ID to a human-readable display string
-        (e.g. the client's Name) and back. Stored so the dropdowns can show names
-        while the record keeps the ID. Uses sample data for now; will read from
-        the shared store once wired.
+        Lets Flight dropdowns show client/airline names while the record keeps
+        the ID. Reads from the in-memory records of the referenced section.
         """
         self.ref_index = {}
         for field, ref in SECTIONS[section].get("references", {}).items():
@@ -458,30 +381,24 @@ class RecordManagerApp(tk.Tk):
         references = SECTIONS[section].get("references", {})
         datetime_field = SECTIONS[section].get("datetime_field")
 
-        # ``fields`` maps 1:1 to rows except the composite date/time field,
-        # which spans two rows, so track the grid row explicitly.
+        # The composite date/time field spans two rows, so track the row here.
         row = 0
         for field in SECTIONS[section]["fields"]:
             if field == datetime_field:
                 row = self._render_datetime_rows(row, field in required)
                 continue
 
-            # Reference fields may show a friendlier label (Client_ID -> Client).
             base_label = references[field]["label"] if field in references else field
             label = ttk.Label(self.fields_frame, text=f"{base_label}:")
             label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
-            # Required labels get a "*" only while flagged red (see
-            # _validate_required); keep the label + base text to toggle it.
             if field in required:
                 self.detail_labels[field] = (label, base_label)
 
-            # The wrapper frame's background is the (recolourable) field border.
             border = tk.Frame(self.fields_frame, background=BORDER_NORMAL)
             border.grid(row=row, column=1, sticky="ew", pady=2)
             var = tk.StringVar()
 
             if field in references:
-                # A dropdown of names; the record still stores the ID.
                 widget = ttk.Combobox(
                     border,
                     textvariable=var,
@@ -495,7 +412,6 @@ class RecordManagerApp(tk.Tk):
                 )
             widget.pack(fill="both", expand=True, padx=1, pady=1)
 
-            # Re-validate live as the field's value changes.
             var.trace_add("write", lambda *_: self._validate_required())
             self.detail_entries[field] = (widget, var, border)
             row += 1
@@ -503,11 +419,7 @@ class RecordManagerApp(tk.Tk):
         self.fields_frame.columnconfigure(1, weight=1)
 
     def _bordered(self, parent, widget_factory):
-        """Create a border-wrapped sub-widget and return (widget, var, border).
-
-        Used for the composite date/time parts so each part can be flagged red
-        individually, matching the wrapper-frame border used elsewhere.
-        """
+        """Wrap a sub-widget in a border frame; return (widget, var, border)."""
         border = tk.Frame(parent, background=BORDER_NORMAL)
         var = tk.StringVar()
         widget = widget_factory(border, var)
@@ -518,10 +430,9 @@ class RecordManagerApp(tk.Tk):
     def _render_datetime_rows(self, row, required):
         """Render the Date (Y/M/D dropdowns) and Time (HH:MM) rows.
 
-        Returns the next free grid row. Populates ``self.dt`` with the five
-        parts; the stored value is reassembled from them in _datetime_value().
+        Returns the next free grid row and populates ``self.dt`` with the five
+        parts, reassembled in _datetime_value().
         """
-        # -- Date row: Year / Month / Day dropdowns --
         date_label = ttk.Label(self.fields_frame, text="Date:")
         date_label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
         if required:
@@ -549,15 +460,13 @@ class RecordManagerApp(tk.Tk):
             date_row,
             lambda p, v: ttk.Combobox(p, textvariable=v, width=4, state="disabled"),
         )
-        # Pack the three date parts left-to-right with small gaps.
         for key in ("year", "month", "day"):
             self.dt[key][2].pack(side="left", padx=(0, 4))
-        # Valid days depend on the chosen year+month.
+        # Valid day count depends on the chosen year+month.
         self.dt["year"][1].trace_add("write", lambda *_: self._update_days())
         self.dt["month"][1].trace_add("write", lambda *_: self._update_days())
         self._update_days()
 
-        # -- Time row: HH : MM (24-hour), digit-and-range validated --
         time_label = ttk.Label(self.fields_frame, text="Time:")
         time_label.grid(row=row + 1, column=0, sticky="w", padx=(0, 8), pady=2)
         if required:
@@ -613,11 +522,7 @@ class RecordManagerApp(tk.Tk):
         return int(proposed) <= maximum
 
     def _datetime_value(self):
-        """Reassemble the composite parts into an ISO 8601 string, or None.
-
-        Returns ``YYYY-MM-DDTHH:MM`` when every part is present and valid,
-        otherwise None (so validation can gate Save).
-        """
+        """Reassemble the parts into ``YYYY-MM-DDTHH:MM``, or None if incomplete."""
         year = self.dt["year"][1].get()
         month = self.dt["month"][1].get()
         day = self.dt["day"][1].get()
@@ -642,10 +547,9 @@ class RecordManagerApp(tk.Tk):
         self.dt["minute"][1].set(minute)
 
     def _show_record(self, record):
-        """Populate the detail fields from a record dict (view mode).
+        """Show a record in the detail panel (or blank it when record is None).
 
-        Reference fields translate the stored ID to its display name; all other
-        fields show their value as-is.
+        Reference fields translate the stored ID to its display name.
         """
         self._record_shown = record is not None
         for field, (widget, var, _) in self.detail_entries.items():
@@ -655,18 +559,16 @@ class RecordManagerApp(tk.Tk):
                 var.set(self.ref_index[field]["to_display"].get(record.get(field), ""))
             else:
                 var.set(str(record.get(field, "")))
-        # Composite date/time field, if this section has one.
         if self.dt:
             datetime_field = SECTIONS[self.current_section]["datetime_field"]
             self._set_datetime(None if record is None else record.get(datetime_field))
         self._set_editing(False)
 
     def _field_state(self, field, editing):
-        """Return the widget state a field should have for the given mode.
+        """Return the widget state for a field in the given mode.
 
-        Reference dropdowns use readonly/disabled (a readonly Combobox is still
-        selectable); text fields use normal/readonly. System-assigned fields
-        (ID, Type) stay read-only in every mode.
+        Dropdowns use readonly/disabled (readonly is still selectable); text
+        fields use normal/readonly; system-assigned fields stay read-only.
         """
         if field in SECTIONS[self.current_section]["auto"]:
             return "readonly"
@@ -675,16 +577,10 @@ class RecordManagerApp(tk.Tk):
         return "normal" if editing else "readonly"
 
     def _set_editing(self, editing):
-        """Toggle the detail panel between read-only and editable.
-
-        When editing, user fields become writable and the Edit button is
-        swapped for Save + Cancel. New is disabled mid-edit to keep the flow
-        simple.
-        """
+        """Toggle the detail panel between read-only and editable."""
         self.editing = editing
         for field, (widget, _, _) in self.detail_entries.items():
             widget.configure(state=self._field_state(field, editing))
-        # Date/time parts: dropdowns readonly/disabled, HH:MM boxes normal/readonly.
         for key, (widget, _, _) in self.dt.items():
             if key in ("hour", "minute"):
                 widget.configure(state="normal" if editing else "readonly")
@@ -705,7 +601,6 @@ class RecordManagerApp(tk.Tk):
             self.required_legend.pack_forget()
             self.save_button.pack_forget()
             self.cancel_button.pack_forget()
-            # Edit only makes sense when a record is selected/shown.
             if self._record_shown:
                 self.edit_button.pack(side="left")
             else:
@@ -722,11 +617,9 @@ class RecordManagerApp(tk.Tk):
         label.configure(text=f"{base} *:" if invalid else f"{base}:")
 
     def _validate_required(self):
-        """Flag empty required fields in red and gate the Save button.
+        """Flag empty required fields red (with a '*') and gate the Save button.
 
-        Runs only while editing. Any required field left blank gets a red
-        border and its label shows a '*'; Save stays disabled until every
-        required field is filled.
+        Runs only while editing.
         """
         if not self.editing:
             return
@@ -739,8 +632,8 @@ class RecordManagerApp(tk.Tk):
             if invalid:
                 all_filled = False
 
-        # Composite date/time field: flag each empty/invalid part, mark the
-        # Date/Time labels, and gate Save on it reassembling into a valid value.
+        # Composite date/time: flag each empty/invalid part and require a valid
+        # reassembled value.
         if self.dt:
             datetime_field = SECTIONS[self.current_section]["datetime_field"]
             dt_required = datetime_field in required
@@ -781,27 +674,20 @@ class RecordManagerApp(tk.Tk):
 
     def select_section(self, section):
         """Switch the visible section (Clients / Airlines / Flights)."""
-        # Dismiss the welcome panel on the first selection (no-op afterwards).
-        self._hide_welcome()
+        self._hide_welcome()  # no-op after the first selection
 
         self.current_section = section
         singular = SECTIONS[section]["singular"]
-
-        # Reflect the active section in the header and the New button label.
         self.list_header.configure(text=section)
         self.new_button.configure(text=f"New {singular}")
 
-        # Sortable sections open sorted by their first column, ascending.
         if SECTIONS[section].get("sortable"):
             self.sort_field = SECTIONS[section]["list_fields"][0]
             self.sort_ascending = True
 
-        # Reset the search box to this section's greyed hint.
         self._search_hint = SECTIONS[section]["search_hint"]
         self._show_placeholder()
 
-        # Rebuild the detail form for this section's fields, then reload the
-        # list from the in-memory store (empty until persistence is wired).
         self._render_fields(section)
         self.current_records = self.section_records[section]
         self._populate_list(self.current_records)
@@ -811,10 +697,9 @@ class RecordManagerApp(tk.Tk):
     def _apply_section_color(self, section):
         """Tint the list + detail panels with the section's pastel colour.
 
-        The panels and their ttk frame/label descendants share two styles
-        (``Panel.TFrame`` / ``Panel.TLabel``); recolouring those styles retints
-        everything at once. Input fields (Treeview, Entry, Combobox, buttons)
-        keep their default look so text stays crisp and readable.
+        The panels' ttk frames/labels share two styles (Panel.TFrame /
+        Panel.TLabel), so recolouring those styles retints everything at once.
+        Input fields (Treeview, Entry, Combobox) keep their default look.
         """
         color = SECTIONS[section].get("color")
         if not color:
@@ -826,11 +711,7 @@ class RecordManagerApp(tk.Tk):
             self._tint_subtree(panel)
 
     def _tint_subtree(self, widget):
-        """Assign the Panel styles to ttk frames/labels in a widget subtree.
-
-        Called after rebuilds so freshly created fields pick up the tint. Only
-        ttk frames and labels are restyled; other widgets are left untouched.
-        """
+        """Assign the Panel styles to ttk frames/labels in a widget subtree."""
         cls = widget.winfo_class()
         if cls == "TFrame":
             widget.configure(style="Panel.TFrame")
@@ -840,12 +721,10 @@ class RecordManagerApp(tk.Tk):
             self._tint_subtree(child)
 
     def _populate_list(self, records):
-        """Fill the list with the given records, one row per record.
+        """Fill the list with ``records``; each row's iid is its index.
 
-        Columns and their headings are set from the section's ``list_fields``
-        so the header row names exactly what is shown (e.g. ID / Name for
-        Clients). Each row's iid is its index into ``records`` so selection can
-        be mapped straight back.
+        Columns/headings come from the section's list_fields; sortable sections
+        get an arrow on the active column and clickable headers.
         """
         fields = SECTIONS[self.current_section]["list_fields"]
         sortable = SECTIONS[self.current_section].get("sortable", False)
@@ -854,7 +733,6 @@ class RecordManagerApp(tk.Tk):
         self.tree["columns"] = fields
         for field in fields:
             if sortable:
-                # Only the active column shows an arrow; others show just the name.
                 if field == self.sort_field:
                     arrow = SORT_ASCENDING if self.sort_ascending else SORT_DESCENDING
                     heading_text = f"{field} {arrow}"
@@ -865,13 +743,9 @@ class RecordManagerApp(tk.Tk):
                     command=lambda f=field: self.on_sort(f),
                 )
             else:
-                # Reset any command left over from a sortable section.
                 self.tree.heading(field, text=field, command="")
-            # ID columns are fixed-width; other columns absorb the extra width.
-            # Without stretch=False on the IDs, ttk splits leftover space evenly
-            # and every column ends up about the same size. The width must fit
-            # the heading label plus the sort arrow, else the arrow is clipped
-            # (a plain "ID" needs little; "Client_ID"/"Airline_ID" need more).
+            # ID columns are fixed-width and sized to fit the heading + arrow;
+            # others stretch to absorb the leftover width.
             is_id = "ID" in field
             id_width = max(70, len(field) * 8 + 40)
             self.tree.column(
@@ -889,11 +763,7 @@ class RecordManagerApp(tk.Tk):
         self.displayed_records = rows
 
     def _sorted(self, records):
-        """Return ``records`` sorted by the current sort field and direction.
-
-        Strings sort case-insensitively; other types (e.g. int IDs) sort
-        naturally. Values within a single column are of one type.
-        """
+        """Sort by the current field/direction (strings case-insensitive)."""
         def key(record):
             value = record.get(self.sort_field, "")
             return value.lower() if isinstance(value, str) else value
@@ -901,18 +771,13 @@ class RecordManagerApp(tk.Tk):
         return sorted(records, key=key, reverse=not self.sort_ascending)
 
     def on_sort(self, field):
-        """Handle a header click: toggle direction, or switch the sort column.
-
-        Clicking the active column flips ascending/descending; clicking another
-        column makes it the active sort, ascending. The list is then rebuilt,
-        preserving any active search filter.
-        """
+        """Header click: toggle the active column's direction, or switch column."""
         if self.sort_field == field:
             self.sort_ascending = not self.sort_ascending
         else:
             self.sort_field = field
             self.sort_ascending = True
-        # Re-run the current view (respects the search box) with the new order.
+        # Rebuild, keeping any active search filter.
         if self.search_var.get().strip():
             self.on_search()
         else:
@@ -948,11 +813,7 @@ class RecordManagerApp(tk.Tk):
             self._show_placeholder()
 
     def _schedule_search(self):
-        """Debounce live search: run the filter shortly after typing stops.
-
-        Rebuilding the list on every keystroke is wasteful once the data set is
-        large, so coalesce rapid edits into a single filter run.
-        """
+        """Debounce live search so rapid typing triggers a single filter run."""
         if self._search_job is not None:
             self.after_cancel(self._search_job)
         self._search_job = self.after(200, self._run_search)
@@ -962,13 +823,8 @@ class RecordManagerApp(tk.Tk):
         self.on_search()
 
     def on_search(self):
-        """Filter the list by the search box text.
-
-        Filtering is done here against the in-memory ``current_records`` (which
-        will later be the records loaded from the store). No persistence is
-        involved -- this only narrows what the list shows.
-        """
-        # The hint is not a query -- while it is showing, show the full list.
+        """Filter the list by the search box text."""
+        # The hint is not a query -- while it shows, show the full list.
         if self._placeholder_active:
             self._populate_list(self.current_records)
             return
@@ -976,8 +832,7 @@ class RecordManagerApp(tk.Tk):
         if not query:
             self._populate_list(self.current_records)
             return
-        # Search every field except Type: it is a constant per section, so it
-        # only ever matches all rows or none (e.g. "e" hitting "Airline").
+        # Skip Type: it is constant per section, so it would match all or none.
         fields = [f for f in SECTIONS[self.current_section]["fields"] if f != "Type"]
         matches = [
             r
@@ -989,9 +844,8 @@ class RecordManagerApp(tk.Tk):
     def _search_text(self, record, field):
         """Return a field's searchable text, lower-cased.
 
-        Reference fields (Flight's Client_ID/Airline_ID) are matched on their
-        resolved name (e.g. "Emirates", "Ada Lovelace"), not the stored ID, so
-        searching a Flight by company or client name works.
+        Reference fields match on their resolved name (not the stored ID), so a
+        Flight can be found by company or client name.
         """
         if field in self.ref_index:
             value = self.ref_index[field]["to_display"].get(record.get(field), "")
@@ -1001,9 +855,7 @@ class RecordManagerApp(tk.Tk):
 
     def on_clear_search(self):
         """Clear the search box and show the full list again."""
-        # Restore the greyed hint (the box is no longer focused after a click).
         self._show_placeholder()
-        # Setting the box schedules a debounced run; cancel it and refresh now.
         if self._search_job is not None:
             self.after_cancel(self._search_job)
             self._search_job = None
@@ -1014,12 +866,11 @@ class RecordManagerApp(tk.Tk):
         self._set_editing(True)
 
     def _field_value(self, field):
-        """Return a field's value in the form the record stores.
+        """Return a field's value as the record stores it.
 
-        Reference dropdowns display a name but store the referenced ID, so this
-        maps the shown name back to its ID. All other fields store their text
-        as shown. This keeps the record's data structure unchanged (Client_ID /
-        Airline_ID remain IDs) regardless of what the dropdown displays.
+        Reference dropdowns map the shown name back to its ID, and the composite
+        date/time collapses to its ISO string -- so the data structure is
+        unchanged regardless of how the field is displayed.
         """
         if self.dt and field == SECTIONS[self.current_section].get("datetime_field"):
             return self._datetime_value()
@@ -1030,13 +881,11 @@ class RecordManagerApp(tk.Tk):
         return value
 
     def on_save(self):
-        """Confirm edits in the UI and return to view mode.
+        """Exit edit mode (Save is only clickable once required fields are valid).
 
-        TODO: wire to the data layer -- build the record dict via
-        ``{f: self._field_value(f) for f in fields}`` (which resolves reference
-        dropdowns back to IDs) and persist through RecordStore. For now this
-        only exits edit mode; nothing is written to disk. (Save is only
-        clickable once all required fields are filled -- see _validate_required.)
+        TODO: wire to the data layer -- build the record via
+        ``{f: self._field_value(f) for f in fields}`` and persist through
+        RecordStore. Nothing is written to disk yet.
         """
         self._set_editing(False)
 
@@ -1047,13 +896,7 @@ class RecordManagerApp(tk.Tk):
         self._show_record(record)
 
     def _next_id(self):
-        """Return the next auto-assigned ID for the current section.
-
-        IDs start at 0 and ascend. The next ID is one past the highest existing
-        ID in this section (0 when there are none yet). Assignment is per record
-        type. Uses the in-memory ``current_records``; once wired to the store
-        this will read from the shared records list instead.
-        """
+        """Return the next auto-assigned ID (one past the highest, or 0)."""
         ids = [
             r["ID"]
             for r in self.current_records
@@ -1062,19 +905,13 @@ class RecordManagerApp(tk.Tk):
         return max(ids) + 1 if ids else 0
 
     def on_new(self):
-        """Start a blank record for the current section.
+        """Open a blank, editable record; ID/Type are pre-filled and read-only.
 
-        Opens the detail panel empty and editable, with required fields flagged
-        red until filled. The system-assigned fields are pre-filled and stay
-        read-only: ``Type`` is set from the section, and ``ID`` gets the next
-        auto-assigned value.
-
-        TODO: wire to the data layer -- on save this should create a new record
-        via the section's factory and add it to the shared store.
+        TODO: wire to the data layer -- on save, create the record via the
+        section's factory and add it to the shared store.
         """
         self.tree.selection_remove(self.tree.selection())
         self._show_record(None)
-        # Pre-fill the system-assigned fields where the section has them.
         if "Type" in self.detail_entries:
             self.detail_entries["Type"][1].set(SECTIONS[self.current_section]["singular"])
         if "ID" in self.detail_entries:
@@ -1082,11 +919,10 @@ class RecordManagerApp(tk.Tk):
         self._set_editing(True)
 
     def on_close(self):
-        """Shutdown path: trigger record saving, then close the window.
+        """Close the window.
 
         TODO: wire to the data layer -- call RecordStore.save() here so the
-        shared records list is written to JSONL on exit. The hook lives here so
-        persistence only needs plugging in, not restructuring.
+        records are written to JSONL on exit.
         """
         # save_records()  # <- to be connected to the store
         self.destroy()
