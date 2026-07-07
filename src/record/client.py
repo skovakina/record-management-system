@@ -1,16 +1,7 @@
-"""Client record definition.
+"""Client record definition and validation."""
 
-A Client record is a plain ``dict`` (per the brief, records are stored as a
-list of dictionaries). This module owns the canonical Client field names and a
-factory that builds a well-formed Client record dictionary.
-"""
-
-# The record ``Type`` value that identifies a Client record within the shared
-# records list.
 RECORD_TYPE = "Client"
 
-# Canonical Client field names, in the order given by the brief. Kept as a
-# single source of truth so the GUI, storage and tests all agree.
 FIELDS = (
     "ID",
     "Type",
@@ -59,15 +50,11 @@ def create_client_record(
     country="",
     phone_number="",
 ):
-    """Build a Client record dictionary with all required fields.
-
-    ``Type`` is set automatically to :data:`RECORD_TYPE`. ``id`` is coerced to
-    ``int`` so records always carry a numeric identifier.
-    """
+    """Build a validated Client record dict with all fields from the brief."""
     return {
-        "ID": int(id),
+        "ID": _validate_id(id),
         "Type": RECORD_TYPE,
-        "Name": name,
+        "Name": _validate_name(name),
         "Address Line 1": address_line_1,
         "Address Line 2": address_line_2,
         "Address Line 3": address_line_3,
