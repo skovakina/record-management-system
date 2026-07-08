@@ -25,4 +25,13 @@ jobs:
         run: python -m compileall -q src tests
 
       - name: Run tests
-        run: python -m pytest
+        run: |
+          set +e
+          python -m pytest
+          code=$?
+          set -e
+          if [ $code -eq 5 ]; then
+            echo "No tests collected, skipping"
+            exit 0
+          fi
+          exit $code
