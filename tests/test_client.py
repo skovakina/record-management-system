@@ -5,14 +5,14 @@ import sys
 import tempfile
 import unittest
 
-# Make ``src`` importable when running ``python -m unittest`` from the repo root.
+# Make src importable when running "python -m unittest" from the repo root.
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), os.pardir, "src")
 )
 
-from record import storage  # noqa: E402
-from record.client import FIELDS, RECORD_TYPE, create_client_record, is_client_record  # noqa: E402
-from record.store import RecordStore  # noqa: E402
+from record import storage
+from record.client import FIELDS, RECORD_TYPE, create_client_record, is_client_record
+from record.store import RecordStore
 
 
 class TestClientRecord(unittest.TestCase):
