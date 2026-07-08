@@ -1,11 +1,10 @@
 """The shared records store: one list of record dicts, persisted as JSONL."""
 
 from record import storage
-from record.client import create_client_record
+from record.client import Client
 
 
 class RecordStore:
-    """Holds the shared ``records`` list and its JSONL persistence."""
 
     def __init__(self, path=storage.DEFAULT_PATH):
         self.path = path
@@ -22,6 +21,6 @@ class RecordStore:
 
     def add_client(self, id, name, **fields):
         """Create a Client record and append it to the shared list."""
-        record = create_client_record(id, name, **fields)
+        record = Client(id, name, **fields).to_dict()
         self.records.append(record)
         return record
