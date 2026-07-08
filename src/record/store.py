@@ -2,7 +2,7 @@
 
 from record import storage
 from record.client import Client
-from record.flight import create_flight_record
+from record.flight import Flight
 
 
 class RecordStore:
@@ -28,8 +28,6 @@ class RecordStore:
 
     def add_flight(self, client_id, airline_id, date, start_city, end_city):
         """Create a Flight record and append it to the shared list."""
-        record = create_flight_record(
-            client_id, airline_id, date, start_city, end_city
-        )
+        record = Flight(client_id, airline_id, date, start_city, end_city).to_dict()
         self.records.append(record)
         return record

@@ -1,51 +1,46 @@
 """Unit tests for Flight records: required fields, save and reload."""
 
+import dataclasses
 import os
 import sys
 import tempfile
 import unittest
 
-# Make ``src`` importable when running ``python -m unittest`` from the repo root.
+# Make src importable when running "python -m unittest" from the repo root.
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), os.pardir, "src")
 )
 
-from record import storage  # noqa: E402
-from record.flight import FIELDS, create_flight_record, is_flight_record  # noqa: E402
-from record.store import RecordStore  # noqa: E402
+from record import storage
+from record.flight import Flight
+from record.store import RecordStore
 
 
 class TestFlightRecord(unittest.TestCase):
     def test_has_all_required_fields(self):
-        record = create_flight_record(1, 2, "2026-07-07T09:00", "London", "Paris")
-        # Every field from the brief is present, and no extras leaked in.
-        self.assertEqual(set(record.keys()), set(FIELDS))
+        record = Flight(1, 2, "2026-07-07T09:00", "London", "Paris").to_dict()
+        expected_fields = {f.name for f in dataclasses.fields(Flight)}
+        self.assertEqual(set(record.keys()), expected_fields)
 
     def test_ids_are_coerced_to_int(self):
-        record = create_flight_record("10", "20", "2026-07-07", "London", "Paris")
-        self.assertEqual(record["Client_ID"], 10)
-        self.assertEqual(record["Airline_ID"], 20)
-        self.assertIsInstance(record["Client_ID"], int)
-        self.assertIsInstance(record["Airline_ID"], int)
+        record = Flight("10", "20", "2026-07-07", "London", "Paris").to_dict()
+        self.assertEqual(record["client_id"], 10)
+        self.assertEqual(record["airline_id"], 20)
+        self.assertIsInstance(record["client_id"], int)
+        self.assertIsInstance(record["airline_id"], int)
 
     def test_field_values_are_stored(self):
-        record = create_flight_record(1, 2, "2026-07-07T09:00", "London", "Paris")
-        self.assertEqual(record["Date"], "2026-07-07T09:00")
-        self.assertEqual(record["Start City"], "London")
-        self.assertEqual(record["End City"], "Paris")
-
-    def test_is_flight_record(self):
-        self.assertTrue(is_flight_record(create_flight_record(1, 2, "d", "A", "B")))
-        self.assertFalse(is_flight_record({"Type": "Client", "ID": 1}))
-        self.assertFalse(is_flight_record("not a dict"))
+        record = Flight(1, 2, "2026-07-07T09:00", "London", "Paris").to_dict()
+        self.assertEqual(record["date"], "2026-07-07T09:00")
+        self.assertEqual(record["start_city"], "London")
+        self.assertEqual(record["end_city"], "Paris")
 
 
 class TestFlightPersistence(unittest.TestCase):
     def setUp(self):
-        # A throwaway JSONL file per test so runs never touch real data.
         fd, self.path = tempfile.mkstemp(suffix=".jsonl")
         os.close(fd)
-        os.remove(self.path)  # RecordStore should treat a missing file as empty.
+        os.remove(self.path)
 
     def tearDown(self):
         if os.path.exists(self.path):
@@ -67,13 +62,12 @@ class TestFlightPersistence(unittest.TestCase):
         store.add_flight(3, 4, "2026-08-01T14:30", "Berlin", "Rome")
         store.save()
 
-        # Simulate restarting the app: a fresh store loads from the same file.
         reloaded = RecordStore(self.path)
         reloaded.load()
 
         self.assertEqual(reloaded.records, store.records)
-        self.assertEqual(reloaded.records[0]["Start City"], "London")
-        self.assertEqual(reloaded.records[1]["Airline_ID"], 4)
+        self.assertEqual(reloaded.records[0]["start_city"], "London")
+        self.assertEqual(reloaded.records[1]["airline_id"], 4)
 
 
 if __name__ == "__main__":
