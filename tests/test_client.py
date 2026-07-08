@@ -47,21 +47,6 @@ class TestClientRecord(unittest.TestCase):
         self.assertFalse(is_client_record({"type": "Airline"}))
         self.assertFalse(is_client_record("not a dict"))
 
-    def test_invalid_id_raises(self):
-        # Includes bool and negative, which int() alone would accept.
-        for bad_id in ("abc", "", None, "3.5", True, -1):
-            with self.assertRaises(ValueError):
-                create_client_record(bad_id, "Ada Lovelace")
-
-    def test_valid_id_forms_are_accepted(self):
-        self.assertEqual(create_client_record(0, "Ada")["id"], 0)
-        self.assertEqual(create_client_record("42", "Ada")["id"], 42)
-
-    def test_empty_name_raises(self):
-        for bad_name in ("", "   ", None):
-            with self.assertRaises(ValueError):
-                create_client_record(1, bad_name)
-
 
 class TestClientPersistence(unittest.TestCase):
     def setUp(self):

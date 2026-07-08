@@ -17,27 +17,6 @@ FIELDS = (
 )
 
 
-def _validate_id(id):
-    """Return ``id`` as a non-negative int, or raise ``ValueError``."""
-    # int(True) would silently become 1, so reject bool before int().
-    if isinstance(id, bool):
-        raise ValueError(f"Client ID must be an integer, got {id!r}")
-    try:
-        client_id = int(id)
-    except (TypeError, ValueError):
-        raise ValueError(f"Client ID must be an integer, got {id!r}")
-    if client_id < 0:
-        raise ValueError(f"Client ID must be non-negative, got {client_id}")
-    return client_id
-
-
-def _validate_name(name):
-    """Return the stripped ``name``, or raise ``ValueError`` if empty."""
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError("Client name is required and cannot be empty")
-    return name.strip()
-
-
 def create_client_record(
     id,
     name,
@@ -50,11 +29,15 @@ def create_client_record(
     country="",
     phone_number="",
 ):
-    """Build a validated Client record dict with all fields from the brief."""
+    """Build a Client record dict with all fields from the brief.
+
+    The caller supplies a valid ID (assigned by RecordStore); the factory just
+    assembles the record.
+    """
     return {
-        "id": _validate_id(id),
+        "id": int(id),
         "type": RECORD_TYPE,
-        "name": _validate_name(name),
+        "name": name,
         "address_line_1": address_line_1,
         "address_line_2": address_line_2,
         "address_line_3": address_line_3,
