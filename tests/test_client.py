@@ -23,9 +23,9 @@ class TestClientRecord(unittest.TestCase):
 
     def test_type_and_id_are_set(self):
         record = create_client_record("42", "Grace Hopper")
-        self.assertEqual(record["Type"], RECORD_TYPE)
-        self.assertEqual(record["ID"], 42)  # coerced to int
-        self.assertIsInstance(record["ID"], int)
+        self.assertEqual(record["type"], RECORD_TYPE)
+        self.assertEqual(record["id"], 42)  # coerced to int
+        self.assertIsInstance(record["id"], int)
 
     def test_field_values_are_stored(self):
         record = create_client_record(
@@ -36,15 +36,15 @@ class TestClientRecord(unittest.TestCase):
             country="UK",
             phone_number="+44 20 1234 5678",
         )
-        self.assertEqual(record["Name"], "Alan Turing")
-        self.assertEqual(record["Address Line 1"], "78 High Holborn")
-        self.assertEqual(record["City"], "London")
-        self.assertEqual(record["Country"], "UK")
-        self.assertEqual(record["Phone Number"], "+44 20 1234 5678")
+        self.assertEqual(record["name"], "Alan Turing")
+        self.assertEqual(record["address_line_1"], "78 High Holborn")
+        self.assertEqual(record["city"], "London")
+        self.assertEqual(record["country"], "UK")
+        self.assertEqual(record["phone_number"], "+44 20 1234 5678")
 
     def test_is_client_record(self):
         self.assertTrue(is_client_record(create_client_record(1, "X")))
-        self.assertFalse(is_client_record({"Type": "Airline"}))
+        self.assertFalse(is_client_record({"type": "Airline"}))
         self.assertFalse(is_client_record("not a dict"))
 
     def test_invalid_id_raises(self):
@@ -54,8 +54,8 @@ class TestClientRecord(unittest.TestCase):
                 create_client_record(bad_id, "Ada Lovelace")
 
     def test_valid_id_forms_are_accepted(self):
-        self.assertEqual(create_client_record(0, "Ada")["ID"], 0)
-        self.assertEqual(create_client_record("42", "Ada")["ID"], 42)
+        self.assertEqual(create_client_record(0, "Ada")["id"], 0)
+        self.assertEqual(create_client_record("42", "Ada")["id"], 42)
 
     def test_empty_name_raises(self):
         for bad_name in ("", "   ", None):
@@ -95,8 +95,8 @@ class TestClientPersistence(unittest.TestCase):
         reloaded.load()
 
         self.assertEqual(reloaded.records, store.records)
-        self.assertEqual(reloaded.records[0]["Name"], "Ada Lovelace")
-        self.assertEqual(reloaded.records[1]["ID"], 2)
+        self.assertEqual(reloaded.records[0]["name"], "Ada Lovelace")
+        self.assertEqual(reloaded.records[1]["id"], 2)
 
 
 if __name__ == "__main__":

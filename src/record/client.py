@@ -3,17 +3,17 @@
 RECORD_TYPE = "Client"
 
 FIELDS = (
-    "ID",
-    "Type",
-    "Name",
-    "Address Line 1",
-    "Address Line 2",
-    "Address Line 3",
-    "City",
-    "State",
-    "Zip Code",
-    "Country",
-    "Phone Number",
+    "id",
+    "type",
+    "name",
+    "address_line_1",
+    "address_line_2",
+    "address_line_3",
+    "city",
+    "state",
+    "zip_code",
+    "country",
+    "phone_number",
 )
 
 
@@ -52,20 +52,20 @@ def create_client_record(
 ):
     """Build a validated Client record dict with all fields from the brief."""
     return {
-        "ID": _validate_id(id),
-        "Type": RECORD_TYPE,
-        "Name": _validate_name(name),
-        "Address Line 1": address_line_1,
-        "Address Line 2": address_line_2,
-        "Address Line 3": address_line_3,
-        "City": city,
-        "State": state,
-        "Zip Code": zip_code,
-        "Country": country,
-        "Phone Number": phone_number,
+        "id": _validate_id(id),
+        "type": RECORD_TYPE,
+        "name": _validate_name(name),
+        "address_line_1": address_line_1,
+        "address_line_2": address_line_2,
+        "address_line_3": address_line_3,
+        "city": city,
+        "state": state,
+        "zip_code": zip_code,
+        "country": country,
+        "phone_number": phone_number,
     }
 
 
 def is_client_record(record):
     """Return ``True`` if ``record`` is a Client record."""
-    return isinstance(record, dict) and record.get("Type") == RECORD_TYPE
+    return isinstance(record, dict) and record.get("type") == RECORD_TYPE
