@@ -9,8 +9,10 @@ import os
 
 import jsonlines
 
-# Resolved relative to this module so it works from any working directory.
-DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "record.jsonl")
+# Data lives in src/data/, separate from the source, resolved via __file__.
+DEFAULT_PATH = os.path.join(
+    os.path.dirname(__file__), os.pardir, "data", "record.jsonl"
+)
 
 
 def load_records(path=DEFAULT_PATH):
