@@ -1,54 +1,25 @@
-"""Client record definition and validation."""
+"""Client record definition."""
 
-RECORD_TYPE = "Client"
-
-FIELDS = (
-    "id",
-    "type",
-    "name",
-    "address_line_1",
-    "address_line_2",
-    "address_line_3",
-    "city",
-    "state",
-    "zip_code",
-    "country",
-    "phone_number",
-)
+from dataclasses import asdict, dataclass
 
 
-def create_client_record(
-    id,
-    name,
-    address_line_1="",
-    address_line_2="",
-    address_line_3="",
-    city="",
-    state="",
-    zip_code="",
-    country="",
-    phone_number="",
-):
-    """Build a Client record dict with all fields from the brief.
+@dataclass
+class Client:
+    id: int
+    name: str
+    address_line_1: str = ""
+    address_line_2: str = ""
+    address_line_3: str = ""
+    city: str = ""
+    state: str = ""
+    zip_code: str = ""
+    country: str = ""
+    phone_number: str = ""
+    type: str = "client"
 
-    The caller supplies a valid ID (assigned by RecordStore); the factory just
-    assembles the record.
-    """
-    return {
-        "id": int(id),
-        "type": RECORD_TYPE,
-        "name": name,
-        "address_line_1": address_line_1,
-        "address_line_2": address_line_2,
-        "address_line_3": address_line_3,
-        "city": city,
-        "state": state,
-        "zip_code": zip_code,
-        "country": country,
-        "phone_number": phone_number,
-    }
+    def __post_init__(self):
+        self.id = int(self.id)
 
-
-def is_client_record(record):
-    """Return ``True`` if ``record`` is a Client record."""
-    return isinstance(record, dict) and record.get("type") == RECORD_TYPE
+    def to_dict(self):
+        """Return this record as a plain dict, e.g. for JSONL persistence."""
+        return asdict(self)
