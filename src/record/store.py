@@ -30,4 +30,3 @@ class RecordStore:
         record = Airline(id, company_name).to_dict()
         self.records.append(record)
         return record
-    
