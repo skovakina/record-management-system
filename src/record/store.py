@@ -2,6 +2,7 @@
 
 from record import storage
 from record.client import Client
+from record.flight import Flight
 
 
 class RecordStore:
@@ -22,5 +23,11 @@ class RecordStore:
     def add_client(self, id, name, **fields):
         """Create a Client record and append it to the shared list."""
         record = Client(id, name, **fields).to_dict()
+        self.records.append(record)
+        return record
+
+    def add_flight(self, client_id, airline_id, date, start_city, end_city):
+        """Create a Flight record and append it to the shared list."""
+        record = Flight(client_id, airline_id, date, start_city, end_city).to_dict()
         self.records.append(record)
         return record
