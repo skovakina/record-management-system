@@ -1,6 +1,6 @@
 """Main window for the Record Management System.
 
-GUI shell only: layout, section navigation and the view/edit/new controls.
+GUI shell only: layout, section navigation and the view/edit/new/delete controls.
 Not wired to persistence yet -- save/load are ``# TODO`` stubs and records are
 held in memory (see ``RecordManagerApp.section_records``).
 """
@@ -9,7 +9,7 @@ import calendar
 import datetime
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 # Each detail field sits in a wrapper frame whose background acts as its border,
 # so the red required-field cue works for both Entry and Combobox (ttk widgets
@@ -30,7 +30,6 @@ SECTIONS = {
         "color": "#DCE9F7",  # powder blue
         "fields": [
             "ID",
-            "Type",
             "Name",
             "Address Line 1",
             "Address Line 2",
@@ -41,7 +40,7 @@ SECTIONS = {
             "Country",
             "Phone Number",
         ],
-        "auto": ["ID", "Type"],
+        "auto": ["ID"],
         "required": [
             "Name",
             "Address Line 1",
@@ -58,8 +57,8 @@ SECTIONS = {
     "Airlines": {
         "singular": "Airline",
         "color": "#DDEFE0",  # mint green
-        "fields": ["ID", "Type", "Company Name"],
-        "auto": ["ID", "Type"],
+        "fields": ["ID", "Company Name"],
+        "auto": ["ID"],
         "required": ["Company Name"],
         "list_fields": ["ID", "Company Name"],
         "sortable": True,
@@ -112,6 +111,14 @@ class RecordManagerApp(tk.Tk):
         self.geometry("960x560")
         self.minsize(820, 460)
 
+        # Use the 'clam' ttk theme on all platforms. macOS's native 'aqua' theme
+        # ignores background colours on ttk frames/labels (leaving the section
+        # tints grey); 'clam' honours them, so colours render consistently
+        # across macOS, Windows and Linux.
+        style = ttk.Style(self)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+
         self.current_section = None
         # Records per section, held in memory (empty until persistence is wired).
         self.section_records = {name: [] for name in SECTIONS}
@@ -136,7 +143,6 @@ class RecordManagerApp(tk.Tk):
         self._placeholder_active = False
         self.editing = False
 
-        self._build_title_bar()
         self._build_body()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -145,32 +151,64 @@ class RecordManagerApp(tk.Tk):
 
     # -- Layout construction ------------------------------------------------
 
-    def _build_title_bar(self):
-        """The banner across the top of the window."""
-        title = ttk.Label(
-            self,
-            text="Travel Agent - Record Management System",
-            anchor="center",
-            padding=(10, 8),
-            font=("Segoe UI", 13, "bold"),
-        )
-        title.pack(side="top", fill="x")
-        ttk.Separator(self, orient="horizontal").pack(side="top", fill="x")
-
     def _build_body(self):
-        """The three columns: sidebar | list | details, in fixed proportions."""
+        """Sidebar on the left; to its right a full-width header bar above a
+        list | details two-column area."""
         body = ttk.Frame(self)
         body.pack(side="top", fill="both", expand=True)
 
+        # Top level: sidebar | content.
         body.columnconfigure(0, weight=COLUMN_WEIGHTS["sidebar"], uniform="cols")
-        body.columnconfigure(1, weight=COLUMN_WEIGHTS["list"], uniform="cols")
-        body.columnconfigure(2, weight=COLUMN_WEIGHTS["detail"], uniform="cols")
+        body.columnconfigure(
+            1,
+            weight=COLUMN_WEIGHTS["list"] + COLUMN_WEIGHTS["detail"],
+            uniform="cols",
+        )
         body.rowconfigure(0, weight=1)
 
         self._build_sidebar(body)
-        self._build_list_panel(body)
-        self._build_detail_panel(body)
-        self._build_welcome(body)
+
+        # Content: a full-width header row (0) over a list | details row (1).
+        content = ttk.Frame(body)
+        content.grid(row=0, column=1, sticky="nsew")
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(0, weight=0)  # header: natural height
+        content.rowconfigure(1, weight=1)  # panels: expand
+
+        self._build_header(content)
+
+        self.two_col = ttk.Frame(content)
+        self.two_col.grid(row=1, column=0, sticky="nsew")
+        self.two_col.columnconfigure(0, weight=COLUMN_WEIGHTS["list"], uniform="lr")
+        self.two_col.columnconfigure(1, weight=COLUMN_WEIGHTS["detail"], uniform="lr")
+        self.two_col.rowconfigure(0, weight=1)
+
+        self._build_list_panel(self.two_col)
+        self._build_detail_panel(self.two_col)
+        self._build_welcome(content)
+
+    def _build_header(self, parent):
+        """Full-width bar above the panels: section name, search, Clear, New."""
+        header = self.header_panel = ttk.Frame(parent, padding=(10, 10, 10, 6))
+        header.grid(row=0, column=0, sticky="ew")
+
+        self.list_header = ttk.Label(
+            header, text="", font=("Segoe UI", 15, "bold")
+        )
+        self.list_header.pack(side="left", anchor="w")
+
+        # Pack New from the right so the search entry fills the middle;
+        # left->right result: section name | search (expanding) | New.
+        self.new_button = ttk.Button(header, text="New", command=self.on_new)
+        self.new_button.pack(side="right", padx=(6, 0))
+
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self._schedule_search())
+        self.search_entry = ttk.Entry(header, textvariable=self.search_var)
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(12, 0))
+        self._search_fg = self.search_entry.cget("foreground")  # for placeholder
+        self.search_entry.bind("<FocusIn>", self._on_search_focus_in)
+        self.search_entry.bind("<FocusOut>", self._on_search_focus_out)
 
     def _build_sidebar(self, parent):
         """Left column: header, coloured section buttons, auto-save hint."""
@@ -178,36 +216,35 @@ class RecordManagerApp(tk.Tk):
         sidebar.grid(row=0, column=0, sticky="nsew")
 
         ttk.Label(
-            sidebar, text="Travel Records", font=("Segoe UI", 11, "bold")
+            sidebar, text="Travel Records", font=("Segoe UI", 15, "bold")
         ).pack(side="top", anchor="w", pady=(0, 8))
 
-        # Classic tk.Button (not ttk): the Windows ttk theme ignores button bg,
-        # but tk.Button honours it, so each button and its hover/press states
-        # can carry the section colour.
+        # Coloured section buttons as tk.Label, not tk.Button/ttk.Button: only
+        # classic tk widgets honour `bg` on macOS's Aqua, and Label does so on
+        # every OS. They're already flat, so a Label looks the same as the flat
+        # button did. Hover/press/click are wired via the bindings below.
         self.nav_buttons = {}
         for name in SECTION_ORDER:
             base = SECTIONS[name]["color"]
             hover = _darken(base, 0.93)
             pressed = _darken(base, 0.85)
-            btn = tk.Button(
+            btn = tk.Label(
                 sidebar,
                 text=name,
                 font=("Segoe UI", 12),
                 bg=base,
                 fg="black",
-                activebackground=pressed,
-                activeforeground="black",
-                relief="flat",
-                borderwidth=0,
-                highlightthickness=0,
                 cursor="hand2",
-                command=lambda n=name: self.select_section(n),
             )
             btn.pack(side="top", fill="x", pady=2, ipady=8)
             btn.bind("<Enter>", lambda e, b=btn, c=hover: b.configure(bg=c))
             btn.bind("<Leave>", lambda e, b=btn, c=base: b.configure(bg=c))
             btn.bind("<ButtonPress-1>", lambda e, b=btn, c=pressed: b.configure(bg=c))
-            btn.bind("<ButtonRelease-1>", lambda e, b=btn, c=hover: b.configure(bg=c))
+            btn.bind(
+                "<ButtonRelease-1>",
+                lambda e, b=btn, c=hover, n=name: (
+                    b.configure(bg=c), self.select_section(n)),
+            )
             self.nav_buttons[name] = btn
 
         ttk.Label(
@@ -219,26 +256,9 @@ class RecordManagerApp(tk.Tk):
         ).pack(side="bottom", anchor="w")
 
     def _build_list_panel(self, parent):
-        """Middle column: section header, search row, entry list."""
-        middle = self.middle_panel = ttk.Frame(parent, padding=10)
-        middle.grid(row=0, column=1, sticky="nsew")
-
-        self.list_header = ttk.Label(middle, text="", font=("Segoe UI", 12, "bold"))
-        self.list_header.pack(side="top", anchor="w", pady=(0, 6))
-
-        # The list filters live as you type (debounced); Clear resets it.
-        search_row = ttk.Frame(middle)
-        search_row.pack(side="top", fill="x", pady=(0, 6))
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._schedule_search())
-        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var)
-        self.search_entry.pack(side="left", fill="x", expand=True)
-        self._search_fg = self.search_entry.cget("foreground")  # default, for placeholder
-        self.search_entry.bind("<FocusIn>", self._on_search_focus_in)
-        self.search_entry.bind("<FocusOut>", self._on_search_focus_out)
-        ttk.Button(search_row, text="Clear", command=self.on_clear_search).pack(
-            side="left", padx=(6, 0)
-        )
+        """Bottom-left: the records list (Treeview) for the selected section."""
+        middle = self.middle_panel = ttk.Frame(parent, padding=(10, 0, 10, 10))
+        middle.grid(row=0, column=0, sticky="nsew")
 
         # Treeview so the list can show column headings; columns are set per
         # section in _populate_list.
@@ -255,10 +275,10 @@ class RecordManagerApp(tk.Tk):
 
     def _build_detail_panel(self, parent):
         """Right column: field details, required-field legend, action buttons."""
-        right = self.right_panel = ttk.Frame(parent, padding=10)
-        right.grid(row=0, column=2, sticky="nsew")
+        right = self.right_panel = ttk.Frame(parent, padding=(10, 0, 10, 10))
+        right.grid(row=0, column=1, sticky="nsew")
 
-        ttk.Label(right, text="Details", font=("Segoe UI", 12, "bold")).pack(
+        ttk.Label(right, text="Details", font=("Segoe UI", 15, "bold")).pack(
             side="top", anchor="w", pady=(0, 6)
         )
 
@@ -283,15 +303,15 @@ class RecordManagerApp(tk.Tk):
         buttons.pack(side="bottom", fill="x", pady=(8, 0))
 
         self.edit_button = ttk.Button(buttons, text="Edit", command=self.on_edit)
+        self.delete_button = ttk.Button(
+            buttons, text="Delete", command=self.on_delete
+        )
         self.save_button = ttk.Button(buttons, text="Save", command=self.on_save)
         self.cancel_button = ttk.Button(
             buttons, text="Cancel", command=self.on_cancel
         )
-        self.new_button = ttk.Button(buttons, text="New", command=self.on_new)
 
-        self.edit_button.pack(side="left")
-        self.new_button.pack(side="right")
-        # Save/Cancel are packed on demand in _set_editing().
+        # Footer buttons are packed per state (View / Edit / New) in _set_editing.
 
     def _build_welcome(self, parent):
         """Welcome panel shown on launch, covering the list + detail columns.
@@ -308,7 +328,7 @@ class RecordManagerApp(tk.Tk):
         ]
 
         self.welcome_panel = ttk.Frame(parent, padding=20)
-        self.welcome_panel.grid(row=0, column=1, columnspan=2, sticky="nsew")
+        self.welcome_panel.grid(row=0, column=0, rowspan=2, sticky="nsew")
 
         message_area = ttk.Frame(self.welcome_panel)
         message_area.pack(side="top", fill="both", expand=True)
@@ -338,16 +358,16 @@ class RecordManagerApp(tk.Tk):
         ).pack(side="bottom")
 
     def _show_welcome(self):
-        """Show the welcome panel and hide the list + detail columns."""
-        self.middle_panel.grid_remove()
-        self.right_panel.grid_remove()
+        """Show the welcome panel, covering the header + list/detail panels."""
+        self.header_panel.grid_remove()
+        self.two_col.grid_remove()
         self.welcome_panel.grid()
 
     def _hide_welcome(self):
-        """Hide the welcome panel and restore the list + detail columns."""
+        """Hide the welcome panel and restore the header + list/detail panels."""
         self.welcome_panel.grid_remove()
-        self.middle_panel.grid()
-        self.right_panel.grid()
+        self.header_panel.grid()
+        self.two_col.grid()
 
     # -- Detail field rendering --------------------------------------------
 
@@ -587,24 +607,27 @@ class RecordManagerApp(tk.Tk):
             else:
                 widget.configure(state="readonly" if editing else "disabled")
 
+        # Footer buttons: clear all four, then show the set for this state.
+        for button in (self.edit_button, self.delete_button,
+                       self.save_button, self.cancel_button):
+            button.pack_forget()
+
         if editing:
             if self.dt:
                 self.time_hint.pack(side="top", anchor="w", pady=(6, 0))
             self.required_legend.pack(side="top", anchor="w", pady=(2, 0))
-            self.edit_button.pack_forget()
-            self.save_button.pack(side="left")
-            self.cancel_button.pack(side="left", padx=(6, 0))
+            # Edit / New: Cancel + Save right-aligned, Save rightmost.
+            self.save_button.pack(side="right")
+            self.cancel_button.pack(side="right", padx=(0, 6))
             self.new_button.configure(state="disabled")
             self._validate_required()
         else:
             self.time_hint.pack_forget()
             self.required_legend.pack_forget()
-            self.save_button.pack_forget()
-            self.cancel_button.pack_forget()
+            # View: Delete far-left, Edit far-right -- only when a record is shown.
             if self._record_shown:
-                self.edit_button.pack(side="left")
-            else:
-                self.edit_button.pack_forget()
+                self.delete_button.pack(side="left")
+                self.edit_button.pack(side="right")
             self.new_button.configure(state="normal")
             self._clear_borders()
 
@@ -707,7 +730,7 @@ class RecordManagerApp(tk.Tk):
         style = ttk.Style()
         style.configure("Panel.TFrame", background=color)
         style.configure("Panel.TLabel", background=color)
-        for panel in (self.middle_panel, self.right_panel):
+        for panel in (self.header_panel, self.middle_panel, self.right_panel):
             self._tint_subtree(panel)
 
     def _tint_subtree(self, widget):
@@ -832,8 +855,7 @@ class RecordManagerApp(tk.Tk):
         if not query:
             self._populate_list(self.current_records)
             return
-        # Skip Type: it is constant per section, so it would match all or none.
-        fields = [f for f in SECTIONS[self.current_section]["fields"] if f != "Type"]
+        fields = SECTIONS[self.current_section]["fields"]
         matches = [
             r
             for r in self.current_records
@@ -853,17 +875,58 @@ class RecordManagerApp(tk.Tk):
             value = record.get(field, "")
         return str(value).lower()
 
-    def on_clear_search(self):
-        """Clear the search box and show the full list again."""
-        self._show_placeholder()
-        if self._search_job is not None:
-            self.after_cancel(self._search_job)
-            self._search_job = None
-        self._populate_list(self.current_records)
-
     def on_edit(self):
         """Make the currently shown record editable."""
         self._set_editing(True)
+
+    def _flight_dependents(self, record):
+        """Return Flights that reference this Client/Airline record by its ID."""
+        ref_field = {"Clients": "Client_ID", "Airlines": "Airline_ID"}.get(
+            self.current_section
+        )
+        if not ref_field:
+            return []
+        rec_id = record.get("ID")
+        return [
+            f for f in self.section_records["Flights"]
+            if f.get(ref_field) == rec_id
+        ]
+
+    def on_delete(self):
+        """Delete the currently shown record (View mode only), with confirmation.
+
+        Blocks deletion of a Client/Airline still referenced by a Flight.
+        TODO: persist the deletion through RecordStore (#7/#8).
+        """
+        if not self._record_shown:
+            return
+        selection = self.tree.selection()
+        if not selection:
+            return
+        record = self.displayed_records[int(selection[0])]
+        singular = SECTIONS[self.current_section]["singular"]
+
+        dependents = self._flight_dependents(record)
+        if dependents:
+            messagebox.showerror(
+                "Cannot delete",
+                f"This {singular} is referenced by {len(dependents)} "
+                "flight(s). Remove or reassign those flights first.",
+            )
+            return
+
+        if not messagebox.askyesno(
+            "Confirm delete",
+            f"Delete this {singular}? This cannot be undone.",
+        ):
+            return
+
+        records = self.section_records[self.current_section]
+        if record in records:
+            records.remove(record)
+        self.tree.selection_remove(selection)
+        self._populate_list(self.current_records)
+        self._show_record(None)
 
     def _field_value(self, field):
         """Return a field's value as the record stores it.
@@ -905,15 +968,14 @@ class RecordManagerApp(tk.Tk):
         return max(ids) + 1 if ids else 0
 
     def on_new(self):
-        """Open a blank, editable record; ID/Type are pre-filled and read-only.
+        """Open a blank, editable record; ID is pre-filled and read-only.
 
         TODO: wire to the data layer -- on save, create the record via the
-        section's factory and add it to the shared store.
+        section's factory (which sets the record's type) and add it to the
+        shared store.
         """
         self.tree.selection_remove(self.tree.selection())
         self._show_record(None)
-        if "Type" in self.detail_entries:
-            self.detail_entries["Type"][1].set(SECTIONS[self.current_section]["singular"])
         if "ID" in self.detail_entries:
             self.detail_entries["ID"][1].set(str(self._next_id()))
         self._set_editing(True)
