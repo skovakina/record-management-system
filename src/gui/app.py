@@ -5,15 +5,17 @@ Not wired to persistence yet -- save/load are ``# TODO`` stubs and records are
 held in memory (see ``RecordManagerApp.section_records``).
 """
 
-import calendar
 import datetime
 
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-# Each detail field sits in a wrapper frame whose background acts as its border,
-# so the red required-field cue works for both Entry and Combobox (ttk widgets
-# can't take a coloured border directly, and tkinter has no rounded corners).
+from record import validation
+from gui.datetime_logic import assemble_iso, days_in_month, split_iso, valid_time_part
+
+# Detail fields (and the DateTimeField parts) wrap their entry in a border frame
+# whose background is the red required-field cue, since ttk widgets can't take a
+# coloured border directly.
 BORDER_NORMAL = "#cccccc"
 BORDER_ERROR = "#d13438"
 
@@ -24,9 +26,9 @@ SORT_DESCENDING = "▼"
 # Per-section config. Field names ARE the record's data keys (snake_case, matching
 # the record.* dataclasses in src/record); the UI label is derived from the key by
 # _label_for, or (for reference fields) taken from the reference's "label". Keys:
-# fields (detail order), auto (system-set, read-only), required (must be filled),
-# list_fields (list columns), plus colour, sortable, search_hint and (Flights)
-# references / datetime_field.
+# fields (detail order), auto (system-set, read-only), list_fields (list columns),
+# plus colour, sortable, search_hint and (Flights) references / datetime_field.
+# Required fields live in record.validation (the single source of truth).
 SECTIONS = {
     "Clients": {
         "singular": "Client",
@@ -44,15 +46,6 @@ SECTIONS = {
             "phone_number",
         ],
         "auto": ["id"],
-        "required": [
-            "name",
-            "address_line_1",
-            "city",
-            "state",
-            "zip_code",
-            "country",
-            "phone_number",
-        ],
         "list_fields": ["id", "name"],
         "sortable": True,
         "search_hint": "Search Client name",
@@ -62,7 +55,6 @@ SECTIONS = {
         "color": "#DDEFE0",  # mint green
         "fields": ["id", "company_name"],
         "auto": ["id"],
-        "required": ["company_name"],
         "list_fields": ["id", "company_name"],
         "sortable": True,
         "search_hint": "Search Company name",
@@ -72,7 +64,6 @@ SECTIONS = {
         "color": "#F6E7CE",  # warm sand
         "fields": ["client_id", "airline_id", "date", "start_city", "end_city"],
         "auto": [],  # Flights have no system ID; the link IDs are user-chosen.
-        "required": ["client_id", "airline_id", "date", "start_city", "end_city"],
         # Shown as name dropdowns but stored as the referenced section's ID;
         # ``label`` renames the field in the UI.
         "references": {
@@ -112,6 +103,191 @@ def _label_for(key):
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
 
 
+class DateTimeField(ttk.Frame):
+    """A composite Date (Y/M/D dropdowns) + Time (HH:MM) field.
+
+    Owns its five sub-widgets and wires in the pure date/time logic from
+    gui.datetime_logic. Stores the value as an ISO-8601 string
+    ("YYYY-MM-DDTHH:MM"). Public API:
+
+    - ``get()``      -> the ISO string, or None when incomplete/invalid.
+    - ``set(iso)``   -> populate the parts from an ISO string (or clear).
+    - ``set_editing(editing)`` -> toggle editable/read-only + the time hint.
+    - ``is_valid()`` -> True when ``get()`` yields a value.
+    - ``refresh_validation(required)`` -> red-border empty/invalid parts, mark
+      the labels, and return whether the field is acceptable.
+    - ``clear_borders()`` -> reset to the neutral (view-mode) look.
+
+    ``on_change`` is called whenever a part changes, so the host form can
+    re-run its own Save-gating validation.
+    """
+
+    def __init__(self, parent, on_change=None):
+        super().__init__(parent)
+        self._on_change = on_change or (lambda: None)
+        self._parts = {}   # key -> (widget, var, border)
+        self._labels = {}  # "date"/"time" -> (label, base_text)
+        self._build()
+
+    def _bordered(self, parent, widget_factory):
+        """Wrap a sub-widget in a border frame; return (widget, var, border)."""
+        border = tk.Frame(parent, background=BORDER_NORMAL)
+        var = tk.StringVar()
+        widget = widget_factory(border, var)
+        widget.pack(padx=1, pady=1)
+        var.trace_add("write", lambda *_: self._on_change())
+        return widget, var, border
+
+    def _build(self):
+        self.columnconfigure(1, weight=1)
+
+        date_label = ttk.Label(self, text="Date:")
+        date_label.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
+        self._labels["date"] = (date_label, "Date")
+        date_row = ttk.Frame(self)
+        date_row.grid(row=0, column=1, sticky="w", pady=2)
+
+        this_year = datetime.date.today().year
+        years = [str(y) for y in range(this_year - 5, this_year + 11)]
+        months = [f"{m:02d}" for m in range(1, 13)]
+
+        self._parts["year"] = self._bordered(
+            date_row,
+            lambda p, v: ttk.Combobox(
+                p, textvariable=v, values=years, width=6, state="disabled"
+            ),
+        )
+        self._parts["month"] = self._bordered(
+            date_row,
+            lambda p, v: ttk.Combobox(
+                p, textvariable=v, values=months, width=4, state="disabled"
+            ),
+        )
+        self._parts["day"] = self._bordered(
+            date_row,
+            lambda p, v: ttk.Combobox(p, textvariable=v, width=4, state="disabled"),
+        )
+        for key in ("year", "month", "day"):
+            self._parts[key][2].pack(side="left", padx=(0, 4))
+        # Valid day count depends on the chosen year+month.
+        self._parts["year"][1].trace_add("write", lambda *_: self._update_days())
+        self._parts["month"][1].trace_add("write", lambda *_: self._update_days())
+        self._update_days()
+
+        time_label = ttk.Label(self, text="Time:")
+        time_label.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=2)
+        self._labels["time"] = (time_label, "Time")
+        time_row = ttk.Frame(self)
+        time_row.grid(row=1, column=1, sticky="w", pady=2)
+
+        hh_check = (self.register(lambda p: valid_time_part(p, 23)), "%P")
+        mm_check = (self.register(lambda p: valid_time_part(p, 59)), "%P")
+        self._parts["hour"] = self._bordered(
+            time_row,
+            lambda p, v: tk.Entry(
+                p, textvariable=v, width=3, justify="center", state="readonly",
+                relief="flat", highlightthickness=0,
+                validate="key", validatecommand=hh_check,
+            ),
+        )
+        self._parts["minute"] = self._bordered(
+            time_row,
+            lambda p, v: tk.Entry(
+                p, textvariable=v, width=3, justify="center", state="readonly",
+                relief="flat", highlightthickness=0,
+                validate="key", validatecommand=mm_check,
+            ),
+        )
+        self._parts["hour"][2].pack(side="left")
+        ttk.Label(time_row, text=":").pack(side="left", padx=3)
+        self._parts["minute"][2].pack(side="left")
+
+        # Shown only while editing.
+        self._hint = ttk.Label(
+            self,
+            text="Time uses the 24-hour clock (HH 00-23, MM 00-59)",
+            foreground="grey",
+            font=("Segoe UI", 8),
+        )
+
+    def _update_days(self):
+        """Refresh the Day dropdown to the valid range for the chosen month."""
+        day_var = self._parts["day"][1]
+        count = days_in_month(self._parts["year"][1].get(), self._parts["month"][1].get())
+        days = [f"{d:02d}" for d in range(1, count + 1)]
+        self._parts["day"][0].configure(values=days)
+        # Drop a day that no longer fits (e.g. 31 -> February).
+        if day_var.get() and day_var.get() not in days:
+            day_var.set("")
+
+    @staticmethod
+    def _mark(label_base, invalid):
+        """Show a trailing '*' on a label only while its field is flagged red."""
+        label, base = label_base
+        label.configure(text=f"{base} *:" if invalid else f"{base}:")
+
+    def _part_values(self):
+        return [self._parts[k][1].get() for k in ("year", "month", "day", "hour", "minute")]
+
+    def get(self):
+        """Reassemble the parts into ``YYYY-MM-DDTHH:MM``, or None if incomplete."""
+        return assemble_iso(*self._part_values())
+
+    def set(self, value):
+        """Populate the composite parts from a stored ISO string (or clear)."""
+        year, month, day, hour, minute = split_iso(value)
+        # Year/month first so _update_days sees them before day is set.
+        self._parts["year"][1].set(year)
+        self._parts["month"][1].set(month)
+        self._parts["day"][1].set(day)
+        self._parts["hour"][1].set(hour)
+        self._parts["minute"][1].set(minute)
+
+    def set_editing(self, editing):
+        """Toggle the parts editable/read-only and show/hide the time hint."""
+        for key, (widget, _, _) in self._parts.items():
+            if key in ("hour", "minute"):
+                widget.configure(state="normal" if editing else "readonly")
+            else:
+                widget.configure(state="readonly" if editing else "disabled")
+        if editing:
+            self._hint.grid(row=2, column=1, sticky="w", pady=(2, 0))
+        else:
+            self._hint.grid_remove()
+
+    def is_valid(self):
+        """True when the parts reassemble into a complete, in-range datetime."""
+        return self.get() is not None
+
+    def refresh_validation(self, required):
+        """Red-border empty/invalid parts, mark labels; return True if acceptable."""
+        date_invalid = False
+        for key in ("year", "month", "day"):
+            bad = required and not self._parts[key][1].get()
+            self._parts[key][2].configure(
+                background=BORDER_ERROR if bad else BORDER_NORMAL
+            )
+            date_invalid = date_invalid or bad
+        time_invalid = False
+        for key, hi in (("hour", 23), ("minute", 59)):
+            value = self._parts[key][1].get()
+            bad = required and (value == "" or not value.isdigit() or int(value) > hi)
+            self._parts[key][2].configure(
+                background=BORDER_ERROR if bad else BORDER_NORMAL
+            )
+            time_invalid = time_invalid or bad
+        self._mark(self._labels["date"], date_invalid)
+        self._mark(self._labels["time"], time_invalid)
+        return not (required and self.get() is None)
+
+    def clear_borders(self):
+        """Reset all part borders and remove the '*' marks (view mode)."""
+        for _, _, border in self._parts.values():
+            border.configure(background=BORDER_NORMAL)
+        self._mark(self._labels["date"], False)
+        self._mark(self._labels["time"], False)
+
+
 class RecordManagerApp(tk.Tk):
     """The main window: sidebar navigation + list + detail/edit panel."""
 
@@ -141,9 +317,8 @@ class RecordManagerApp(tk.Tk):
         self.ref_index = {}
         # Required-field labels, so the trailing "*" tracks the red border.
         self.detail_labels = {}
-        self.dt_labels = {}
-        # Composite date/time parts: part -> (widget, var, border). Empty off Flights.
-        self.dt = {}
+        # The Flight date/time widget (a DateTimeField), or None off Flights.
+        self.datetime_field = None
         # A record is shown (vs blank); the Edit button only appears when one is.
         self._record_shown = False
         self.sort_field = None
@@ -295,13 +470,8 @@ class RecordManagerApp(tk.Tk):
         self.fields_frame = ttk.Frame(right)
         self.fields_frame.pack(side="top", fill="both", expand=True)
 
-        # time_hint and required_legend are shown only while editing (_set_editing).
-        self.time_hint = ttk.Label(
-            right,
-            text="Time uses the 24-hour clock (HH 00-23, MM 00-59)",
-            foreground="grey",
-            font=("Segoe UI", 8),
-        )
+        # required_legend is shown only while editing (_set_editing); the Flight
+        # time hint lives inside the DateTimeField widget.
         self.required_legend = ttk.Label(
             right,
             text="*  Required field",
@@ -402,12 +572,11 @@ class RecordManagerApp(tk.Tk):
         for child in self.fields_frame.winfo_children():
             child.destroy()
         self.detail_entries = {}
-        self.dt = {}
         self.detail_labels = {}
-        self.dt_labels = {}
+        self.datetime_field = None
         self._build_ref_index(section)
 
-        required = SECTIONS[section]["required"]
+        required = validation.REQUIRED[SECTIONS[section]["singular"].lower()]
         references = SECTIONS[section].get("references", {})
         datetime_field = SECTIONS[section].get("datetime_field")
 
@@ -415,7 +584,13 @@ class RecordManagerApp(tk.Tk):
         row = 0
         for field in SECTIONS[section]["fields"]:
             if field == datetime_field:
-                row = self._render_datetime_rows(row, field in required)
+                self.datetime_field = DateTimeField(
+                    self.fields_frame, on_change=self._validate_required
+                )
+                self.datetime_field.grid(
+                    row=row, column=0, columnspan=2, sticky="ew", pady=2
+                )
+                row += 1
                 continue
 
             base_label = references[field]["label"] if field in references else _label_for(field)
@@ -448,134 +623,6 @@ class RecordManagerApp(tk.Tk):
 
         self.fields_frame.columnconfigure(1, weight=1)
 
-    def _bordered(self, parent, widget_factory):
-        """Wrap a sub-widget in a border frame; return (widget, var, border)."""
-        border = tk.Frame(parent, background=BORDER_NORMAL)
-        var = tk.StringVar()
-        widget = widget_factory(border, var)
-        widget.pack(padx=1, pady=1)
-        var.trace_add("write", lambda *_: self._validate_required())
-        return widget, var, border
-
-    def _render_datetime_rows(self, row, required):
-        """Render the Date (Y/M/D dropdowns) and Time (HH:MM) rows.
-
-        Returns the next free grid row and populates ``self.dt`` with the five
-        parts, reassembled in _datetime_value().
-        """
-        date_label = ttk.Label(self.fields_frame, text="Date:")
-        date_label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
-        if required:
-            self.dt_labels["date"] = (date_label, "Date")
-        date_row = ttk.Frame(self.fields_frame)
-        date_row.grid(row=row, column=1, sticky="w", pady=2)
-
-        this_year = datetime.date.today().year
-        years = [str(y) for y in range(this_year - 5, this_year + 11)]
-        months = [f"{m:02d}" for m in range(1, 13)]
-
-        self.dt["year"] = self._bordered(
-            date_row,
-            lambda p, v: ttk.Combobox(
-                p, textvariable=v, values=years, width=6, state="disabled"
-            ),
-        )
-        self.dt["month"] = self._bordered(
-            date_row,
-            lambda p, v: ttk.Combobox(
-                p, textvariable=v, values=months, width=4, state="disabled"
-            ),
-        )
-        self.dt["day"] = self._bordered(
-            date_row,
-            lambda p, v: ttk.Combobox(p, textvariable=v, width=4, state="disabled"),
-        )
-        for key in ("year", "month", "day"):
-            self.dt[key][2].pack(side="left", padx=(0, 4))
-        # Valid day count depends on the chosen year+month.
-        self.dt["year"][1].trace_add("write", lambda *_: self._update_days())
-        self.dt["month"][1].trace_add("write", lambda *_: self._update_days())
-        self._update_days()
-
-        time_label = ttk.Label(self.fields_frame, text="Time:")
-        time_label.grid(row=row + 1, column=0, sticky="w", padx=(0, 8), pady=2)
-        if required:
-            self.dt_labels["time"] = (time_label, "Time")
-        time_row = ttk.Frame(self.fields_frame)
-        time_row.grid(row=row + 1, column=1, sticky="w", pady=2)
-
-        hh_check = (self.register(lambda p: self._valid_time_part(p, 23)), "%P")
-        mm_check = (self.register(lambda p: self._valid_time_part(p, 59)), "%P")
-        self.dt["hour"] = self._bordered(
-            time_row,
-            lambda p, v: tk.Entry(
-                p, textvariable=v, width=3, justify="center", state="readonly",
-                relief="flat", highlightthickness=0,
-                validate="key", validatecommand=hh_check,
-            ),
-        )
-        self.dt["minute"] = self._bordered(
-            time_row,
-            lambda p, v: tk.Entry(
-                p, textvariable=v, width=3, justify="center", state="readonly",
-                relief="flat", highlightthickness=0,
-                validate="key", validatecommand=mm_check,
-            ),
-        )
-        self.dt["hour"][2].pack(side="left")
-        ttk.Label(time_row, text=":").pack(side="left", padx=3)
-        self.dt["minute"][2].pack(side="left")
-
-        return row + 2
-
-    def _update_days(self):
-        """Refresh the Day dropdown to the valid range for the chosen month."""
-        year_str = self.dt["year"][1].get()
-        month_str = self.dt["month"][1].get()
-        if year_str.isdigit() and month_str.isdigit():
-            count = calendar.monthrange(int(year_str), int(month_str))[1]
-        else:
-            count = 31
-        days = [f"{d:02d}" for d in range(1, count + 1)]
-        self.dt["day"][0].configure(values=days)
-        # Drop a day that no longer fits (e.g. 31 -> February).
-        if self.dt["day"][1].get() and self.dt["day"][1].get() not in days:
-            self.dt["day"][1].set("")
-
-    @staticmethod
-    def _valid_time_part(proposed, maximum):
-        """Allow empty or a 1-2 digit number within 0..maximum (Entry key check)."""
-        if proposed == "":
-            return True
-        if not proposed.isdigit() or len(proposed) > 2:
-            return False
-        return int(proposed) <= maximum
-
-    def _datetime_value(self):
-        """Reassemble the parts into ``YYYY-MM-DDTHH:MM``, or None if incomplete."""
-        year = self.dt["year"][1].get()
-        month = self.dt["month"][1].get()
-        day = self.dt["day"][1].get()
-        hour = self.dt["hour"][1].get()
-        minute = self.dt["minute"][1].get()
-        if not (year and month and day and hour != "" and minute != ""):
-            return None
-        if int(hour) > 23 or int(minute) > 59:
-            return None
-        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}T{int(hour):02d}:{int(minute):02d}"
-
-    def _set_datetime(self, value):
-        """Populate the composite parts from a stored ISO string (or clear)."""
-        date_part, _, time_part = str(value or "").partition("T")
-        year, month, day = (date_part.split("-") + ["", "", ""])[:3]
-        hour, minute = (time_part.split(":") + ["", ""])[:2]
-        # Year/month first so _update_days sees them before day is set.
-        self.dt["year"][1].set(year)
-        self.dt["month"][1].set(month)
-        self.dt["day"][1].set(day)
-        self.dt["hour"][1].set(hour)
-        self.dt["minute"][1].set(minute)
-
     def _show_record(self, record):
         """Show a record in the detail panel (or blank it when record is None).
 
@@ -589,9 +636,11 @@ class RecordManagerApp(tk.Tk):
                 var.set(self.ref_index[field]["to_display"].get(record.get(field), ""))
             else:
                 var.set(str(record.get(field, "")))
-        if self.dt:
+        if self.datetime_field is not None:
             datetime_field = SECTIONS[self.current_section]["datetime_field"]
-            self._set_datetime(None if record is None else record.get(datetime_field))
+            self.datetime_field.set(
+                None if record is None else record.get(datetime_field)
+            )
         self._set_editing(False)
 
     def _field_state(self, field, editing):
@@ -611,11 +660,8 @@ class RecordManagerApp(tk.Tk):
         self.editing = editing
         for field, (widget, _, _) in self.detail_entries.items():
             widget.configure(state=self._field_state(field, editing))
-        for key, (widget, _, _) in self.dt.items():
-            if key in ("hour", "minute"):
-                widget.configure(state="normal" if editing else "readonly")
-            else:
-                widget.configure(state="readonly" if editing else "disabled")
+        if self.datetime_field is not None:
+            self.datetime_field.set_editing(editing)
 
         # Footer buttons: clear all four, then show the set for this state.
         for button in (self.edit_button, self.delete_button,
@@ -623,8 +669,6 @@ class RecordManagerApp(tk.Tk):
             button.pack_forget()
 
         if editing:
-            if self.dt:
-                self.time_hint.pack(side="top", anchor="w", pady=(6, 0))
             self.required_legend.pack(side="top", anchor="w", pady=(2, 0))
             # Edit / New: Cancel + Save right-aligned, Save rightmost.
             self.save_button.pack(side="right")
@@ -632,7 +676,6 @@ class RecordManagerApp(tk.Tk):
             self.new_button.configure(state="disabled")
             self._validate_required()
         else:
-            self.time_hint.pack_forget()
             self.required_legend.pack_forget()
             # View: Delete far-left, Edit far-right -- only when a record is shown.
             if self._record_shown:
@@ -656,38 +699,26 @@ class RecordManagerApp(tk.Tk):
         """
         if not self.editing:
             return
-        required = SECTIONS[self.current_section]["required"]
+        record_type = SECTIONS[self.current_section]["singular"].lower()
+        required = validation.REQUIRED[record_type]
+
+        # Ask the shared validator which flat fields are invalid (single source
+        # of truth in record.validation); the GUI only renders its result.
+        data = {f: var.get() for f, (_, var, _) in self.detail_entries.items()}
+        errors = validation.validate(record_type, data)
         all_filled = True
-        for field, (_, var, border) in self.detail_entries.items():
-            invalid = field in required and not var.get().strip()
+        for field, (_, _, border) in self.detail_entries.items():
+            invalid = field in errors
             border.configure(background=BORDER_ERROR if invalid else BORDER_NORMAL)
             self._mark_label(self.detail_labels.get(field), invalid)
             if invalid:
                 all_filled = False
 
-        # Composite date/time: flag each empty/invalid part and require a valid
-        # reassembled value.
-        if self.dt:
+        # Composite date/time delegates to the DateTimeField widget.
+        if self.datetime_field is not None:
             datetime_field = SECTIONS[self.current_section]["datetime_field"]
             dt_required = datetime_field in required
-            date_invalid = False
-            for key in ("year", "month", "day"):
-                bad = dt_required and not self.dt[key][1].get()
-                self.dt[key][2].configure(
-                    background=BORDER_ERROR if bad else BORDER_NORMAL
-                )
-                date_invalid = date_invalid or bad
-            time_invalid = False
-            for key, hi in (("hour", 23), ("minute", 59)):
-                value = self.dt[key][1].get()
-                bad = dt_required and (value == "" or not value.isdigit() or int(value) > hi)
-                self.dt[key][2].configure(
-                    background=BORDER_ERROR if bad else BORDER_NORMAL
-                )
-                time_invalid = time_invalid or bad
-            self._mark_label(self.dt_labels.get("date"), date_invalid)
-            self._mark_label(self.dt_labels.get("time"), time_invalid)
-            if dt_required and self._datetime_value() is None:
+            if not self.datetime_field.refresh_validation(dt_required):
                 all_filled = False
 
         self.save_button.configure(state="normal" if all_filled else "disabled")
@@ -696,12 +727,10 @@ class RecordManagerApp(tk.Tk):
         """Reset field borders to normal and remove the '*' marks (view mode)."""
         for _, _, border in self.detail_entries.values():
             border.configure(background=BORDER_NORMAL)
-        for _, _, border in self.dt.values():
-            border.configure(background=BORDER_NORMAL)
         for label_base in self.detail_labels.values():
             self._mark_label(label_base, False)
-        for label_base in self.dt_labels.values():
-            self._mark_label(label_base, False)
+        if self.datetime_field is not None:
+            self.datetime_field.clear_borders()
 
     # -- Navigation / event handlers ---------------------------------------
 
@@ -946,8 +975,11 @@ class RecordManagerApp(tk.Tk):
         date/time collapses to its ISO string -- so the data structure is
         unchanged regardless of how the field is displayed.
         """
-        if self.dt and field == SECTIONS[self.current_section].get("datetime_field"):
-            return self._datetime_value()
+        if (
+            self.datetime_field is not None
+            and field == SECTIONS[self.current_section].get("datetime_field")
+        ):
+            return self.datetime_field.get()
         _, var, _ = self.detail_entries[field]
         value = var.get()
         if field in self.ref_index:
