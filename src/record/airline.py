@@ -1,32 +1,18 @@
-"""Airline record definition.
+"""Airline record definition."""
 
-An Airline record is a plain dictionary stored in the shared records list.
-This module owns the canonical Airline field names and a factory function
-that builds a well-formed Airline record dictionary.
-"""
-
-RECORD_TYPE = "Airline"
-
-FIELDS = (
-    "ID",
-    "Type",
-    "Company Name",
-)
+from dataclasses import asdict, dataclass
 
 
-def create_airline_record(id, company_name):
-    """Build an Airline record dictionary with all required fields.
+@dataclass
+class Airline:
+    id: int
+    company_name: str
+    type: str = "airline"
 
-    ``Type`` is set automatically to :data:`RECORD_TYPE`. ``id`` is coerced to
-    ``int`` so records always carry a numeric identifier.
-    """
-    return {
-        "ID": int(id),
-        "Type": RECORD_TYPE,
-        "Company Name": company_name,
-    }
+    def __post_init__(self):
+        self.id = int(self.id)
 
-
-def is_airline_record(record):
-    """Return ``True`` if ``record`` is an Airline record."""
-    return isinstance(record, dict) and record.get("Type") == RECORD_TYPE
+    def to_dict(self):
+        """Return this record as a plain dict, e.g. for JSONL persistence."""
+        return asdict(self)
+    
