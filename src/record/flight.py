@@ -10,6 +10,7 @@ class Flight:
     date: str
     start_city: str
     end_city: str
+    type: str = "flight"
 
     def __post_init__(self):
         self.client_id = int(self.client_id)
