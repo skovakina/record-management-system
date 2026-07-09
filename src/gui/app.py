@@ -21,68 +21,71 @@ BORDER_ERROR = "#d13438"
 SORT_ASCENDING = "▲"
 SORT_DESCENDING = "▼"
 
-# Per-section config. Keys: fields (detail order), auto (system-set, read-only),
-# required (must be filled), list_fields (list columns), plus colour, sortable,
-# search_hint and (Flights) references / datetime_field.
+# Per-section config. Field names ARE the record's data keys (snake_case, matching
+# the record.* dataclasses in src/record); the UI label is derived from the key by
+# _label_for, or (for reference fields) taken from the reference's "label". Keys:
+# fields (detail order), auto (system-set, read-only), required (must be filled),
+# list_fields (list columns), plus colour, sortable, search_hint and (Flights)
+# references / datetime_field.
 SECTIONS = {
     "Clients": {
         "singular": "Client",
         "color": "#DCE9F7",  # powder blue
         "fields": [
-            "ID",
-            "Name",
-            "Address Line 1",
-            "Address Line 2",
-            "Address Line 3",
-            "City",
-            "State",
-            "Zip Code",
-            "Country",
-            "Phone Number",
+            "id",
+            "name",
+            "address_line_1",
+            "address_line_2",
+            "address_line_3",
+            "city",
+            "state",
+            "zip_code",
+            "country",
+            "phone_number",
         ],
-        "auto": ["ID"],
+        "auto": ["id"],
         "required": [
-            "Name",
-            "Address Line 1",
-            "City",
-            "State",
-            "Zip Code",
-            "Country",
-            "Phone Number",
+            "name",
+            "address_line_1",
+            "city",
+            "state",
+            "zip_code",
+            "country",
+            "phone_number",
         ],
-        "list_fields": ["ID", "Name"],
+        "list_fields": ["id", "name"],
         "sortable": True,
         "search_hint": "Search Client name",
     },
     "Airlines": {
         "singular": "Airline",
         "color": "#DDEFE0",  # mint green
-        "fields": ["ID", "Company Name"],
-        "auto": ["ID"],
-        "required": ["Company Name"],
-        "list_fields": ["ID", "Company Name"],
+        "fields": ["id", "company_name"],
+        "auto": ["id"],
+        "required": ["company_name"],
+        "list_fields": ["id", "company_name"],
         "sortable": True,
         "search_hint": "Search Company name",
     },
     "Flights": {
         "singular": "Flight",
         "color": "#F6E7CE",  # warm sand
-        "fields": ["Client_ID", "Airline_ID", "Date", "Start City", "End City"],
+        "fields": ["client_id", "airline_id", "date", "start_city", "end_city"],
         "auto": [],  # Flights have no system ID; the link IDs are user-chosen.
-        "required": ["Client_ID", "Airline_ID", "Date", "Start City", "End City"],
+        "required": ["client_id", "airline_id", "date", "start_city", "end_city"],
         # Shown as name dropdowns but stored as the referenced section's ID;
         # ``label`` renames the field in the UI.
         "references": {
-            "Client_ID": {"section": "Clients", "display": "Name", "label": "Client"},
-            "Airline_ID": {
+            "client_id": {"section": "Clients", "display": "name", "label": "Client"},
+            "airline_id": {
                 "section": "Airlines",
-                "display": "Company Name",
+                "display": "company_name",
                 "label": "Airline",
             },
         },
-        # "Date" is entered as Y/M/D + HH:MM and reassembled into a stored ISO string.
-        "datetime_field": "Date",
-        "list_fields": ["Client_ID", "Airline_ID", "Date"],
+        # "date" is entered as Y/M/D + HH:MM and reassembled into a stored ISO string.
+        "datetime_field": "date",
+        "list_fields": ["client_id", "airline_id", "date"],
         "sortable": True,  # Date sorts chronologically as an ISO string.
         "search_hint": "Search company or client name",
     },
@@ -97,6 +100,13 @@ def _darken(hex_color, factor):
     r, g, b = (int(value[i:i + 2], 16) for i in (0, 2, 4))
     r, g, b = (int(c * factor) for c in (r, g, b))
     return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _label_for(key):
+    """Turn a snake_case data key into a display label (``zip_code`` -> ``Zip Code``)."""
+    return " ".join(
+        "ID" if part == "id" else part.capitalize() for part in key.split("_")
+    )
 
 # Proportional widths (sidebar | list | detail), held on resize via uniform.
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
@@ -382,7 +392,7 @@ class RecordManagerApp(tk.Tk):
             to_id, to_display = {}, {}
             for record in self.section_records[ref["section"]]:
                 display = str(record.get(ref["display"], ""))
-                rec_id = record.get("ID")
+                rec_id = record.get("id")
                 to_id[display] = rec_id
                 to_display[rec_id] = display
             self.ref_index[field] = {"to_id": to_id, "to_display": to_display}
@@ -408,7 +418,7 @@ class RecordManagerApp(tk.Tk):
                 row = self._render_datetime_rows(row, field in required)
                 continue
 
-            base_label = references[field]["label"] if field in references else field
+            base_label = references[field]["label"] if field in references else _label_for(field)
             label = ttk.Label(self.fields_frame, text=f"{base_label}:")
             label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
             if field in required:
@@ -755,22 +765,23 @@ class RecordManagerApp(tk.Tk):
 
         self.tree["columns"] = fields
         for field in fields:
+            label = _label_for(field)
             if sortable:
                 if field == self.sort_field:
                     arrow = SORT_ASCENDING if self.sort_ascending else SORT_DESCENDING
-                    heading_text = f"{field} {arrow}"
+                    heading_text = f"{label} {arrow}"
                 else:
-                    heading_text = field
+                    heading_text = label
                 self.tree.heading(
                     field, text=heading_text,
                     command=lambda f=field: self.on_sort(f),
                 )
             else:
-                self.tree.heading(field, text=field, command="")
+                self.tree.heading(field, text=label, command="")
             # ID columns are fixed-width and sized to fit the heading + arrow;
             # others stretch to absorb the leftover width.
-            is_id = "ID" in field
-            id_width = max(70, len(field) * 8 + 40)
+            is_id = field == "id" or field.endswith("_id")
+            id_width = max(70, len(label) * 8 + 40)
             self.tree.column(
                 field,
                 width=id_width if is_id else 140,
@@ -881,12 +892,12 @@ class RecordManagerApp(tk.Tk):
 
     def _flight_dependents(self, record):
         """Return Flights that reference this Client/Airline record by its ID."""
-        ref_field = {"Clients": "Client_ID", "Airlines": "Airline_ID"}.get(
+        ref_field = {"Clients": "client_id", "Airlines": "airline_id"}.get(
             self.current_section
         )
         if not ref_field:
             return []
-        rec_id = record.get("ID")
+        rec_id = record.get("id")
         return [
             f for f in self.section_records["Flights"]
             if f.get(ref_field) == rec_id
@@ -961,9 +972,9 @@ class RecordManagerApp(tk.Tk):
     def _next_id(self):
         """Return the next auto-assigned ID (one past the highest, or 0)."""
         ids = [
-            r["ID"]
+            r["id"]
             for r in self.current_records
-            if isinstance(r.get("ID"), int)
+            if isinstance(r.get("id"), int)
         ]
         return max(ids) + 1 if ids else 0
 
@@ -976,8 +987,8 @@ class RecordManagerApp(tk.Tk):
         """
         self.tree.selection_remove(self.tree.selection())
         self._show_record(None)
-        if "ID" in self.detail_entries:
-            self.detail_entries["ID"][1].set(str(self._next_id()))
+        if "id" in self.detail_entries:
+            self.detail_entries["id"][1].set(str(self._next_id()))
         self._set_editing(True)
 
     def on_close(self):
