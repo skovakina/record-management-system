@@ -15,4 +15,3 @@ class Airline:
     def to_dict(self):
         """Return this record as a plain dict, e.g. for JSONL persistence."""
         return asdict(self)
-    
