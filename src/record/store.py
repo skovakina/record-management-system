@@ -22,15 +22,15 @@ class RecordStore:
         """Persist the shared list to disk."""
         storage.save_records(self.records, self.path)
 
-    def add_client(self, id, name, **fields):
+    def add_client(self, name, **fields):
         """Create a Client record and append it to the shared list."""
-        record = Client(id, name, **fields).to_dict()
+        record = Client(name, **fields).to_dict()
         self.records.append(record)
         return record
 
-    def add_airline(self, id, company_name):
+    def add_airline(self, company_name):
         """Create an Airline record and append it to the shared list."""
-        record = Airline(id, company_name).to_dict()
+        record = Airline(company_name).to_dict()
         self.records.append(record)
         return record
 
