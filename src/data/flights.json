@@ -1,0 +1,26 @@
+[
+  {
+    "client_id": 1,
+    "airline_id": 1,
+    "date": "2026-08-15T09:30",
+    "start_city": "Seattle",
+    "end_city": "Denver",
+    "type": "flight"
+  },
+  {
+    "client_id": 2,
+    "airline_id": 3,
+    "date": "2026-09-02T14:45",
+    "start_city": "Portland",
+    "end_city": "San Francisco",
+    "type": "flight"
+  },
+  {
+    "client_id": 3,
+    "airline_id": 2,
+    "date": "2026-10-20T20:15",
+    "start_city": "San Francisco",
+    "end_city": "Chicago",
+    "type": "flight"
+  }
+]

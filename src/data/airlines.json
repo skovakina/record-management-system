@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "company_name": "Airline 1",
+    "type": "airline"
+  },
+  {
+    "id": 2,
+    "company_name": "Airline 2",
+    "type": "airline"
+  },
+  {
+    "id": 3,
+    "company_name": "Airline 3",
+    "type": "airline"
+  }
+]

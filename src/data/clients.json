@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "name": "Maya Brooks",
+    "address_line_1": "100 Main Street",
+    "address_line_2": "",
+    "address_line_3": "",
+    "city": "Seattle",
+    "state": "WA",
+    "zip_code": "98101",
+    "country": "USA",
+    "phone_number": "+1 206 555 0101",
+    "type": "client"
+  },
+  {
+    "id": 2,
+    "name": "Noah Patel",
+    "address_line_1": "200 Market Street",
+    "address_line_2": "",
+    "address_line_3": "",
+    "city": "Portland",
+    "state": "OR",
+    "zip_code": "97201",
+    "country": "USA",
+    "phone_number": "+1 503 555 0102",
+    "type": "client"
+  },
+  {
+    "id": 3,
+    "name": "Elena Rivera",
+    "address_line_1": "300 Lake Avenue",
+    "address_line_2": "",
+    "address_line_3": "",
+    "city": "San Francisco",
+    "state": "CA",
+    "zip_code": "94105",
+    "country": "USA",
+    "phone_number": "+1 415 555 0103",
+    "type": "client"
+  }
+]
