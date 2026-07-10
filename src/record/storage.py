@@ -1,40 +1,54 @@
-"""JSONL persistence for records.
+"""JSON loading and saving for the client, airline, and flight collections."""
 
-Records are stored as one JSON object per line (JSON Lines). The whole file is
-the on-disk form of the shared ``records`` list. Loading returns a list of
-dicts; saving overwrites the file with the current list.
-"""
-
+import json
 import os
 
-import jsonlines
-
-# Data lives in src/data/, separate from the source, resolved via __file__.
-DEFAULT_PATH = os.path.join(
-    os.path.dirname(__file__), os.pardir, "data", "record.jsonl"
+DATA_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, "data")
 )
 
+COLLECTION_TYPES = {
+    "clients": "client",
+    "airlines": "airline",
+    "flights": "flight",
+}
 
-def load_records(path=DEFAULT_PATH):
-    """Load records from ``path`` and return them as a list of dicts.
-
-    Returns an empty list if the file does not exist (first run) or is empty.
-    """
-    if not os.path.exists(path):
-        return []
-
-    records = []
-    with jsonlines.open(path, mode="r") as reader:
-        for record in reader:
-            records.append(record)
-    return records
+DEFAULT_COLLECTION_PATHS = {
+    "clients": os.path.join(DATA_DIR, "clients.json"),
+    "airlines": os.path.join(DATA_DIR, "airlines.json"),
+    "flights": os.path.join(DATA_DIR, "flights.json"),
+}
 
 
-def save_records(records, path=DEFAULT_PATH):
-    """Write ``records`` (a list of dicts) to ``path`` as JSONL.
+def load_records(path):
+    """Load records from a JSON file."""
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
 
-    The file is overwritten so its contents always match the in-memory list.
-    """
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with jsonlines.open(path, mode="w") as writer:
-        writer.write_all(records)
+
+def save_records(records, path):
+    """Save records to a JSON file."""
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(records, file, indent=2)
+
+
+def load_collections(paths=None):
+    """Load all collections into a dictionary keyed by collection name."""
+    if paths is None:
+        paths = DEFAULT_COLLECTION_PATHS
+
+    return {
+        "clients": load_records(paths["clients"]),
+        "airlines": load_records(paths["airlines"]),
+        "flights": load_records(paths["flights"]),
+    }
+
+
+def save_collections(collections, paths=None):
+    """Save all collections to their JSON files."""
+    if paths is None:
+        paths = DEFAULT_COLLECTION_PATHS
+
+    save_records(collections["clients"], paths["clients"])
+    save_records(collections["airlines"], paths["airlines"])
+    save_records(collections["flights"], paths["flights"])
