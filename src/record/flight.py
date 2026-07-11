@@ -1,20 +1,18 @@
 """Flight record definition."""
 
-from dataclasses import asdict, dataclass
+import uuid
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
 class Flight:
-    client_id: int
-    airline_id: int
+    client_id: str
+    airline_id: str
     date: str
     start_city: str
     end_city: str
     type: str = "flight"
-
-    def __post_init__(self):
-        self.client_id = int(self.client_id)
-        self.airline_id = int(self.airline_id)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def to_dict(self):
         """Return this record as a plain dict, e.g. for JSONL persistence."""
