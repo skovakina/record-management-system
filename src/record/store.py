@@ -18,13 +18,13 @@ class RecordStore:
     def save_records(self):
         storage.save_collections(self.records, self.collection_paths)
 
-    def add_client_record(self, client_id, name, **fields):
-        record = Client(client_id, name, **fields).to_dict()
+    def add_client_record(self, name, **fields):
+        record = Client(name, **fields).to_dict()
         self.records["clients"].append(record)
         return record
 
-    def add_airline_record(self, airline_id, company_name):
-        record = Airline(airline_id, company_name).to_dict()
+    def add_airline_record(self, company_name):
+        record = Airline(company_name).to_dict()
         self.records["airlines"].append(record)
         return record
 
