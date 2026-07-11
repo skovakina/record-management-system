@@ -1,6 +1,30 @@
 # Record Management System
 
->decided to keep a few notes in readme for the future report
+## Prerequisites
+
+1. Install [Homebrew](https://brew.sh/)
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+2 .Install matching Python and Tkinter versions (macOS).
+> Important: Use the same version for `python` and `python-tk`.
+
+```bash
+brew install python@3.14 python-tk@3.14
+```
+
+## Run the app
+
+From the project directory 
+
+```bash
+$(brew --prefix)/bin/python3.14 -m venv --clear .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python src/main.py
+```
 
 ## Changelog
 
