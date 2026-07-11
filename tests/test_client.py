@@ -1,5 +1,3 @@
-"""Unit tests for Client records."""
-
 import dataclasses
 import os
 import sys

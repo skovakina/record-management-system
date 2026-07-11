@@ -1,5 +1,3 @@
-"""Unit tests for loading record collections from JSON files."""
-
 import json
 import os
 import sys

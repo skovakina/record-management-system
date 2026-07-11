@@ -1,5 +1,3 @@
-"""Unit tests for Airline records."""
-
 import dataclasses
 import os
 import sys
