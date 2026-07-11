@@ -2,8 +2,13 @@
 
 ## Prerequisites
 
-Install matching Python and Tkinter versions (macOS).
+1. Install [Homebrew](https://brew.sh/)
 
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+2 .Install matching Python and Tkinter versions (macOS).
 > Important: Use the same version for `python` and `python-tk`.
 
 ```bash
@@ -12,10 +17,10 @@ brew install python@3.14 python-tk@3.14
 
 ## Run the app
 
-From the project directory:
+From the project directory 
 
 ```bash
-/opt/homebrew/bin/python3.14 -m venv --clear .venv
+$(brew --prefix)/bin/python3.14 -m venv --clear .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python src/main.py
@@ -33,4 +38,3 @@ Record ids (`Client`, `Airline`, `Flight`) are now auto-generated `uuid4` string
 
 
 **Why UUID over alternatives:** other options considered were a utility function generating a random integer, or assigning ids based on list index. Those approaches can work for a simple project, but they're more prone to bugs — random integers need a uniqueness check to avoid collisions, and index-based ids shift or collide once records are deleted or reordered. Python's built-in `uuid4()` is a well-tested, standard-library solution that guarantees uniqueness, 
-
