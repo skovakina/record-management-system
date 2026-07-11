@@ -1,8 +1,8 @@
 """Main window for the Record Management System.
 
-GUI shell only: layout, section navigation and the view/edit/new/delete controls.
-Not wired to persistence yet -- save/load are ``# TODO`` stubs and records are
-held in memory (see ``RecordManagerApp.section_records``).
+GUI shell only: layout, section navigation, and the view/edit/new/delete
+controls. Not wired to persistence yet; save/load are TODO stubs and records
+are held in memory (see RecordManagerApp.section_records).
 """
 
 import datetime
@@ -13,22 +13,17 @@ from tkinter import messagebox, ttk
 from record import validation
 from gui.datetime_logic import assemble_iso, days_in_month, split_iso, valid_time_part
 
-# Detail fields (and the DateTimeField parts) wrap their entry in a border frame
-# whose background is the red required-field cue, since ttk widgets can't take a
-# coloured border directly.
+# ttk widgets can't take a coloured border, so entries are wrapped in a border
+# frame whose background carries the red required-field cue.
 BORDER_NORMAL = "#cccccc"
 BORDER_ERROR = "#d13438"
 
-# Arrow shown on the active sort column only; inactive columns show no arrow.
+# Arrow shown on the active sort column only.
 SORT_ASCENDING = "▲"
 SORT_DESCENDING = "▼"
 
-# Per-section config. Field names ARE the record's data keys (snake_case, matching
-# the record.* dataclasses in src/record); the UI label is derived from the key by
-# _label_for, or (for reference fields) taken from the reference's "label". Keys:
-# fields (detail order), auto (system-set, read-only), list_fields (list columns),
-# plus colour, sortable, search_hint and (Flights) references / datetime_field.
-# Required fields live in record.validation (the single source of truth).
+# Per-section config driving the GUI. The field-name strings are the record data
+# keys (snake_case), and must match the record.* dataclasses and validation.REQUIRED.
 SECTIONS = {
     "Clients": {
         "singular": "Client",
@@ -63,9 +58,9 @@ SECTIONS = {
         "singular": "Flight",
         "color": "#F6E7CE",  # warm sand
         "fields": ["client_id", "airline_id", "date", "start_city", "end_city"],
-        "auto": [],  # Flights have no system ID; the link IDs are user-chosen.
+        "auto": [],  # Flights have no system ID; link IDs are user-chosen.
         # Shown as name dropdowns but stored as the referenced section's ID;
-        # ``label`` renames the field in the UI.
+        # label renames the field in the UI.
         "references": {
             "client_id": {"section": "Clients", "display": "name", "label": "Client"},
             "airline_id": {
@@ -86,7 +81,7 @@ SECTION_ORDER = ["Clients", "Airlines", "Flights"]
 
 
 def _darken(hex_color, factor):
-    """Return ``hex_color`` scaled toward black by ``factor`` (0..1)."""
+    """Return hex_color scaled toward black by factor (0..1)."""
     value = hex_color.lstrip("#")
     r, g, b = (int(value[i:i + 2], 16) for i in (0, 2, 4))
     r, g, b = (int(c * factor) for c in (r, g, b))
@@ -94,7 +89,7 @@ def _darken(hex_color, factor):
 
 
 def _label_for(key):
-    """Turn a snake_case data key into a display label (``zip_code`` -> ``Zip Code``)."""
+    """Turn a snake_case data key into a display label (zip_code -> Zip Code)."""
     return " ".join(
         "ID" if part == "id" else part.capitalize() for part in key.split("_")
     )
@@ -107,18 +102,17 @@ class DateTimeField(ttk.Frame):
     """A composite Date (Y/M/D dropdowns) + Time (HH:MM) field.
 
     Owns its five sub-widgets and wires in the pure date/time logic from
-    gui.datetime_logic. Stores the value as an ISO-8601 string
-    ("YYYY-MM-DDTHH:MM"). Public API:
+    gui.datetime_logic. Public API:
 
-    - ``get()``      -> the ISO string, or None when incomplete/invalid.
-    - ``set(iso)``   -> populate the parts from an ISO string (or clear).
-    - ``set_editing(editing)`` -> toggle editable/read-only + the time hint.
-    - ``is_valid()`` -> True when ``get()`` yields a value.
-    - ``refresh_validation(required)`` -> red-border empty/invalid parts, mark
+    - get()      -> the ISO string, or None when incomplete/invalid.
+    - set(iso)   -> populate the parts from an ISO string (or clear).
+    - set_editing(editing) -> toggle editable/read-only + the time hint.
+    - is_valid() -> True when get() yields a value.
+    - refresh_validation(required) -> red-border empty/invalid parts, mark
       the labels, and return whether the field is acceptable.
-    - ``clear_borders()`` -> reset to the neutral (view-mode) look.
+    - clear_borders() -> reset to the neutral (view-mode) look.
 
-    ``on_change`` is called whenever a part changes, so the host form can
+    on_change is called whenever a part changes, so the host form can
     re-run its own Save-gating validation.
     """
 
@@ -230,7 +224,7 @@ class DateTimeField(ttk.Frame):
         return [self._parts[k][1].get() for k in ("year", "month", "day", "hour", "minute")]
 
     def get(self):
-        """Reassemble the parts into ``YYYY-MM-DDTHH:MM``, or None if incomplete."""
+        """Reassemble the parts into YYYY-MM-DDTHH:MM, or None if incomplete."""
         return assemble_iso(*self._part_values())
 
     def set(self, value):
@@ -297,10 +291,8 @@ class RecordManagerApp(tk.Tk):
         self.geometry("960x560")
         self.minsize(820, 460)
 
-        # Use the 'clam' ttk theme on all platforms. macOS's native 'aqua' theme
-        # ignores background colours on ttk frames/labels (leaving the section
-        # tints grey); 'clam' honours them, so colours render consistently
-        # across macOS, Windows and Linux.
+        # macOS's 'aqua' theme ignores ttk background colours (section tints
+        # would render grey); 'clam' honours them on every platform.
         style = ttk.Style(self)
         if "clam" in style.theme_names():
             style.theme_use("clam")
@@ -382,8 +374,7 @@ class RecordManagerApp(tk.Tk):
         )
         self.list_header.pack(side="left", anchor="w")
 
-        # Pack New from the right so the search entry fills the middle;
-        # left->right result: section name | search (expanding) | New.
+        # Packed from the right so the search entry expands to fill the middle.
         self.new_button = ttk.Button(header, text="New", command=self.on_new)
         self.new_button.pack(side="right", padx=(6, 0))
 
@@ -404,10 +395,8 @@ class RecordManagerApp(tk.Tk):
             sidebar, text="Travel Records", font=("Segoe UI", 15, "bold")
         ).pack(side="top", anchor="w", pady=(0, 8))
 
-        # Coloured section buttons as tk.Label, not tk.Button/ttk.Button: only
-        # classic tk widgets honour `bg` on macOS's Aqua, and Label does so on
-        # every OS. They're already flat, so a Label looks the same as the flat
-        # button did. Hover/press/click are wired via the bindings below.
+        # tk.Label instead of Button: only classic tk widgets honour bg on
+        # macOS's Aqua, and a flat Label looks the same as a flat button did.
         self.nav_buttons = {}
         for name in SECTION_ORDER:
             base = SECTIONS[name]["color"]
@@ -677,7 +666,7 @@ class RecordManagerApp(tk.Tk):
             self._validate_required()
         else:
             self.required_legend.pack_forget()
-            # View: Delete far-left, Edit far-right -- only when a record is shown.
+            # View: Delete far-left, Edit far-right, only when a record is shown.
             if self._record_shown:
                 self.delete_button.pack(side="left")
                 self.edit_button.pack(side="right")
@@ -702,8 +691,8 @@ class RecordManagerApp(tk.Tk):
         record_type = SECTIONS[self.current_section]["singular"].lower()
         required = validation.REQUIRED[record_type]
 
-        # Ask the shared validator which flat fields are invalid (single source
-        # of truth in record.validation); the GUI only renders its result.
+        # Ask the shared validator (record.validation) which fields are invalid;
+        # the GUI only renders the result.
         data = {f: var.get() for f, (_, var, _) in self.detail_entries.items()}
         errors = validation.validate(record_type, data)
         all_filled = True
@@ -783,7 +772,7 @@ class RecordManagerApp(tk.Tk):
             self._tint_subtree(child)
 
     def _populate_list(self, records):
-        """Fill the list with ``records``; each row's iid is its index.
+        """Fill the list with records; each row's iid is its index.
 
         Columns/headings come from the section's list_fields; sortable sections
         get an arrow on the active column and clickable headers.
