@@ -1,4 +1,4 @@
-"""JSON loading and saving for the client, airline, and flight collections."""
+"""Read and write records from JSON."""
 
 import json
 import os
@@ -13,7 +13,7 @@ COLLECTION_TYPES = {
     "flights": "flight",
 }
 
-DEFAULT_COLLECTION_PATHS = {
+COLLECTION_PATHS = {
     "clients": os.path.join(DATA_DIR, "clients.json"),
     "airlines": os.path.join(DATA_DIR, "airlines.json"),
     "flights": os.path.join(DATA_DIR, "flights.json"),
@@ -21,22 +21,16 @@ DEFAULT_COLLECTION_PATHS = {
 
 
 def load_records(path):
-    """Load records from a JSON file."""
     with open(path, encoding="utf-8") as file:
         return json.load(file)
 
 
 def save_records(records, path):
-    """Save records to a JSON file."""
     with open(path, "w", encoding="utf-8") as file:
         json.dump(records, file, indent=2)
 
 
-def load_collections(paths=None):
-    """Load all collections into a dictionary keyed by collection name."""
-    if paths is None:
-        paths = DEFAULT_COLLECTION_PATHS
-
+def load_collections(paths=COLLECTION_PATHS):
     return {
         "clients": load_records(paths["clients"]),
         "airlines": load_records(paths["airlines"]),
@@ -44,11 +38,7 @@ def load_collections(paths=None):
     }
 
 
-def save_collections(collections, paths=None):
-    """Save all collections to their JSON files."""
-    if paths is None:
-        paths = DEFAULT_COLLECTION_PATHS
-
+def save_collections(collections, paths=COLLECTION_PATHS):
     save_records(collections["clients"], paths["clients"])
     save_records(collections["airlines"], paths["airlines"])
     save_records(collections["flights"], paths["flights"])

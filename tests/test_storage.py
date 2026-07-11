@@ -52,7 +52,7 @@ class TestStorageLoading(unittest.TestCase):
             ],
         )
 
-        collections = RecordStore(self.paths).load()
+        collections = RecordStore(self.paths).load_records()
 
         self.assertEqual(set(collections), {"clients", "airlines", "flights"})
         self.assertEqual(collections["clients"][0]["name"], "Maya Brooks")
@@ -60,7 +60,7 @@ class TestStorageLoading(unittest.TestCase):
         self.assertEqual(collections["flights"][0]["client_id"], 1)
 
     def test_default_dummy_data_loads(self):
-        collections = RecordStore().load()
+        collections = RecordStore().load_records()
 
         self.assertEqual(len(collections["clients"]), 3)
         self.assertEqual(len(collections["airlines"]), 3)
