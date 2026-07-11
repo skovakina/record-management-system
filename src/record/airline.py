@@ -1,16 +1,15 @@
 """Airline record definition."""
 
-from dataclasses import asdict, dataclass
+import uuid
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
 class Airline:
-    id: int
     company_name: str
     type: str = "airline"
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def __post_init__(self):
-        self.id = int(self.id)
 
     def to_dict(self):
         """Return this record as a plain dict, e.g. for JSONL persistence."""
