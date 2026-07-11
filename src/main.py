@@ -4,9 +4,9 @@ from record.store import RecordStore
 
 def main():
     store = RecordStore()
-    records = store.load_records()
+    store.load_records()
 
-    RecordManagerApp(records).mainloop()
+    RecordManagerApp(store).mainloop()
 
 
 if __name__ == "__main__":

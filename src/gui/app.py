@@ -290,12 +290,12 @@ class DateTimeField(ttk.Frame):
 class RecordManagerApp(tk.Tk):
     """The main window: sidebar navigation + list + detail/edit panel."""
 
-    def __init__(self, records=None):
+    def __init__(self, store):
         super().__init__()
         self.title("Travel Agent - Record Management System")
         self.geometry("960x560")
         self.minsize(820, 460)
-        self.records = records
+        self.store = store
 
         # macOS's 'aqua' theme ignores ttk background colours (section tints
         # would render grey); 'clam' honours them on every platform.
@@ -334,10 +334,7 @@ class RecordManagerApp(tk.Tk):
     # -- Layout construction ------------------------------------------------
 
     def _section_records(self):
-        if self.records is None:
-            return {name: [] for name in SECTIONS}
-
-        return self.records
+        return self.store.records
 
     def _build_body(self):
         """Sidebar on the left; to its right a full-width header bar above a
@@ -1031,11 +1028,3 @@ class RecordManagerApp(tk.Tk):
         """
         # save_records()  # <- to be connected to the store
         self.destroy()
-
-
-def main():
-    RecordManagerApp().mainloop()
-
-
-if __name__ == "__main__":
-    main()
