@@ -32,18 +32,30 @@ class TestStorageLoading(unittest.TestCase):
     def test_store_loads_three_collections(self):
         self.write_collection(
             "clients",
-            [{"id": 1, "name": "Maya Brooks", "type": "client"}],
+            [
+                {
+                    "id": "5e2e9a10-fc8d-48a3-8c5a-55225b08ad3f",
+                    "name": "Maya Brooks",
+                    "type": "client",
+                }
+            ],
         )
         self.write_collection(
             "airlines",
-            [{"id": 1, "company_name": "Airline 1", "type": "airline"}],
+            [
+                {
+                    "id": "137758b0-f491-45dd-99fa-8f1deea6dc7a",
+                    "company_name": "Airline 1",
+                    "type": "airline",
+                }
+            ],
         )
         self.write_collection(
             "flights",
             [
                 {
-                    "client_id": 1,
-                    "airline_id": 1,
+                    "client_id": "5e2e9a10-fc8d-48a3-8c5a-55225b08ad3f",
+                    "airline_id": "137758b0-f491-45dd-99fa-8f1deea6dc7a",
                     "date": "2026-08-15T09:30",
                     "start_city": "Seattle",
                     "end_city": "Denver",
@@ -57,7 +69,10 @@ class TestStorageLoading(unittest.TestCase):
         self.assertEqual(set(collections), {"clients", "airlines", "flights"})
         self.assertEqual(collections["clients"][0]["name"], "Maya Brooks")
         self.assertEqual(collections["airlines"][0]["company_name"], "Airline 1")
-        self.assertEqual(collections["flights"][0]["client_id"], 1)
+        self.assertEqual(
+            collections["flights"][0]["client_id"],
+            "5e2e9a10-fc8d-48a3-8c5a-55225b08ad3f",
+        )
 
     def test_default_dummy_data_loads(self):
         collections = RecordStore().load_records()
