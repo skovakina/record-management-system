@@ -4,7 +4,7 @@ from record.store import RecordStore
 
 def main():
     store = RecordStore()
-    records = store.load()
+    records = store.load_records()
 
     RecordManagerApp(records).mainloop()
 
