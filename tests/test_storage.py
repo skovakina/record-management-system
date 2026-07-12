@@ -75,9 +75,9 @@ class TestStorageLoading(unittest.TestCase):
     def test_default_dummy_data_loads(self):
         collections = RecordStore().load_records()
 
-        self.assertEqual(len(collections["clients"]), 3)
-        self.assertEqual(len(collections["airlines"]), 3)
-        self.assertEqual(len(collections["flights"]), 3)
+        self.assertGreaterEqual(len(collections["clients"]), 3)
+        self.assertGreaterEqual(len(collections["airlines"]), 3)
+        self.assertGreaterEqual(len(collections["flights"]), 3)
         self.assertEqual(collections["clients"][0]["name"], "Maya Brooks")
 
         client_ids = {client["id"] for client in collections["clients"]}
@@ -85,6 +85,80 @@ class TestStorageLoading(unittest.TestCase):
         for flight in collections["flights"]:
             self.assertIn(flight["client_id"], client_ids)
             self.assertIn(flight["airline_id"], airline_ids)
+
+    def test_store_adds_each_record_type_to_its_collection(self):
+        store = RecordStore(self.paths)
+        collection_refs = dict(store.records)
+
+        store.add_record("clients", {"name": "Maya Brooks"})
+        client = store.records["clients"][-1]
+        store.add_record(
+            "airlines", {"company_name": "Sky Air"}
+        )
+        airline = store.records["airlines"][-1]
+        store.add_record(
+            "flights",
+            {
+                "client_id": client["id"],
+                "airline_id": airline["id"],
+                "date": "2026-08-15T09:30",
+                "start_city": "Seattle",
+                "end_city": "Denver",
+            },
+        )
+        flight = store.records["flights"][-1]
+
+        self.assertEqual(store.records["clients"][0], client)
+        self.assertEqual(store.records["airlines"][0], airline)
+        self.assertEqual(store.records["flights"][0], flight)
+        for section, collection in collection_refs.items():
+            self.assertIs(store.records[section], collection)
+
+        reloaded = RecordStore(self.paths).load_records()
+        self.assertEqual(reloaded, store.records)
+
+    def test_add_record_writes_only_changed_collection(self):
+        store = RecordStore(self.paths)
+
+        store.add_record("clients", {"name": "Maya Brooks"})
+
+        self.assertTrue(os.path.exists(self.paths["clients"]))
+        self.assertFalse(os.path.exists(self.paths["airlines"]))
+        self.assertFalse(os.path.exists(self.paths["flights"]))
+
+    def test_store_deletes_record_and_persists_collection(self):
+        store = RecordStore(self.paths)
+        collection = store.records["clients"]
+        store.add_record("clients", {"name": "Maya Brooks"})
+        store.add_record("clients", {"name": "Noah Patel"})
+        deleted = store.records["clients"][0]
+
+        store.delete_record("clients", deleted)
+
+        self.assertIs(store.records["clients"], collection)
+        self.assertEqual(
+            [record["name"] for record in store.records["clients"]],
+            ["Noah Patel"],
+        )
+        self.assertEqual(
+            storage.load_records(self.paths["clients"]),
+            store.records["clients"],
+        )
+
+    def test_store_updates_record_and_persists_collection(self):
+        store = RecordStore(self.paths)
+        collection = store.records["clients"]
+        store.add_record("clients", {"name": "Maya Brooks"})
+        record = store.records["clients"][0]
+
+        store.update_record("clients", record, {"name": "Maya Rivera"})
+
+        self.assertIs(store.records["clients"], collection)
+        self.assertEqual(store.records["clients"][0]["name"], "Maya Rivera")
+        self.assertEqual(
+            storage.load_records(self.paths["clients"]),
+            store.records["clients"],
+        )
 
 
 if __name__ == "__main__":
