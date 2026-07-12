@@ -25,7 +25,7 @@ SORT_DESCENDING = "▼"
 # Per-section config driving the GUI. The field-name strings are the record data
 # keys (snake_case), and must match the record.* dataclasses and validation.REQUIRED.
 SECTIONS = {
-    "Clients": {
+    "clients": {
         "singular": "Client",
         "color": "#DCE9F7",  # powder blue
         "fields": [
@@ -45,7 +45,7 @@ SECTIONS = {
         "sortable": True,
         "search_hint": "Search Client name",
     },
-    "Airlines": {
+    "airlines": {
         "singular": "Airline",
         "color": "#DDEFE0",  # mint green
         "fields": ["id", "company_name"],
@@ -54,7 +54,7 @@ SECTIONS = {
         "sortable": True,
         "search_hint": "Search Company name",
     },
-    "Flights": {
+    "flights": {
         "singular": "Flight",
         "color": "#F6E7CE",  # warm sand
         "fields": ["client_id", "airline_id", "date", "start_city", "end_city"],
@@ -62,9 +62,9 @@ SECTIONS = {
         # Shown as name dropdowns but stored as the referenced section's ID;
         # label renames the field in the UI.
         "references": {
-            "client_id": {"section": "Clients", "display": "name", "label": "Client"},
+            "client_id": {"section": "clients", "display": "name", "label": "Client"},
             "airline_id": {
-                "section": "Airlines",
+                "section": "airlines",
                 "display": "company_name",
                 "label": "Airline",
             },
@@ -77,7 +77,7 @@ SECTIONS = {
     },
 }
 
-SECTION_ORDER = ["Clients", "Airlines", "Flights"]
+SECTION_ORDER = ["clients", "airlines", "flights"]
 
 
 def _darken(hex_color, factor):
@@ -93,6 +93,11 @@ def _label_for(key):
     return " ".join(
         "ID" if part == "id" else part.capitalize() for part in key.split("_")
     )
+
+
+def _section_label(section):
+    """Return the display label for a lowercase section key."""
+    return section.capitalize()
 
 # Proportional widths (sidebar | list | detail), held on resize via uniform.
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
@@ -285,11 +290,12 @@ class DateTimeField(ttk.Frame):
 class RecordManagerApp(tk.Tk):
     """The main window: sidebar navigation + list + detail/edit panel."""
 
-    def __init__(self):
+    def __init__(self, store):
         super().__init__()
         self.title("Travel Agent - Record Management System")
         self.geometry("960x560")
         self.minsize(820, 460)
+        self.store = store
 
         # macOS's 'aqua' theme ignores ttk background colours (section tints
         # would render grey); 'clam' honours them on every platform.
@@ -298,8 +304,7 @@ class RecordManagerApp(tk.Tk):
             style.theme_use("clam")
 
         self.current_section = None
-        # Records per section, held in memory (empty until persistence is wired).
-        self.section_records = {name: [] for name in SECTIONS}
+        self.section_records = self._section_records()
         self.current_records = []
         # Rows currently shown (differs from current_records when a search filters).
         self.displayed_records = []
@@ -327,6 +332,9 @@ class RecordManagerApp(tk.Tk):
         self._show_welcome()
 
     # -- Layout construction ------------------------------------------------
+
+    def _section_records(self):
+        return self.store.records
 
     def _build_body(self):
         """Sidebar on the left; to its right a full-width header bar above a
@@ -404,7 +412,7 @@ class RecordManagerApp(tk.Tk):
             pressed = _darken(base, 0.85)
             btn = tk.Label(
                 sidebar,
-                text=name,
+                text=_section_label(name),
                 font=("Segoe UI", 12),
                 bg=base,
                 fg="black",
@@ -729,7 +737,7 @@ class RecordManagerApp(tk.Tk):
 
         self.current_section = section
         singular = SECTIONS[section]["singular"]
-        self.list_header.configure(text=section)
+        self.list_header.configure(text=_section_label(section))
         self.new_button.configure(text=f"New {singular}")
 
         if SECTIONS[section].get("sortable"):
@@ -910,14 +918,14 @@ class RecordManagerApp(tk.Tk):
 
     def _flight_dependents(self, record):
         """Return Flights that reference this Client/Airline record by its ID."""
-        ref_field = {"Clients": "client_id", "Airlines": "airline_id"}.get(
+        ref_field = {"clients": "client_id", "airlines": "airline_id"}.get(
             self.current_section
         )
         if not ref_field:
             return []
         rec_id = record.get("id")
         return [
-            f for f in self.section_records["Flights"]
+            f for f in self.section_records["flights"]
             if f.get(ref_field) == rec_id
         ]
 
@@ -1020,11 +1028,3 @@ class RecordManagerApp(tk.Tk):
         """
         # save_records()  # <- to be connected to the store
         self.destroy()
-
-
-def main():
-    RecordManagerApp().mainloop()
-
-
-if __name__ == "__main__":
-    main()

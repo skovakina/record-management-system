@@ -1,0 +1,26 @@
+[
+  {
+    "client_id": "5e2e9a10-fc8d-48a3-8c5a-55225b08ad3f",
+    "airline_id": "137758b0-f491-45dd-99fa-8f1deea6dc7a",
+    "date": "2026-08-15T09:30",
+    "start_city": "Seattle",
+    "end_city": "Denver",
+    "type": "flight"
+  },
+  {
+    "client_id": "ab76df8a-9d1f-4ea2-bda2-2f2327ec2d5f",
+    "airline_id": "4a84cc9a-ea1f-4649-b4a0-c45e4e083736",
+    "date": "2026-09-02T14:45",
+    "start_city": "Portland",
+    "end_city": "San Francisco",
+    "type": "flight"
+  },
+  {
+    "client_id": "3e93c81f-b3cb-4c4a-8d67-0c04db54ec31",
+    "airline_id": "567f0235-a3a0-4534-86bb-d76cb8204d23",
+    "date": "2026-10-20T20:15",
+    "start_city": "San Francisco",
+    "end_city": "Chicago",
+    "type": "flight"
+  }
+]
