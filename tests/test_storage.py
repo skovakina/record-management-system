@@ -145,6 +145,21 @@ class TestStorageLoading(unittest.TestCase):
             store.records["clients"],
         )
 
+    def test_store_updates_record_and_persists_collection(self):
+        store = RecordStore(self.paths)
+        collection = store.records["clients"]
+        store.add_record("clients", {"name": "Maya Brooks"})
+        record = store.records["clients"][0]
+
+        store.update_record("clients", record, {"name": "Maya Rivera"})
+
+        self.assertIs(store.records["clients"], collection)
+        self.assertEqual(store.records["clients"][0]["name"], "Maya Rivera")
+        self.assertEqual(
+            storage.load_records(self.paths["clients"]),
+            store.records["clients"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

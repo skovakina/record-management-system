@@ -982,29 +982,46 @@ class RecordManagerApp(tk.Tk):
             return self.ref_index[field]["to_id"].get(value)
         return value
 
+    def _form_values(self):
+        fields = SECTIONS[self.current_section]["fields"]
+        auto_fields = SECTIONS[self.current_section]["auto"]
+        return {
+            field: self._field_value(field)
+            for field in fields
+            if field not in auto_fields
+        }
+
+    def _select_saved_record(self, record):
+        self._populate_list(self.current_records)
+        index = next(
+            index
+            for index, displayed in enumerate(self.displayed_records)
+            if displayed is record
+        )
+        self.tree.selection_set(str(index))
+        self.tree.focus(str(index))
+        self._show_record(record)
+
+    def _add_record(self):
+        self.store.add_record(self.current_section, self._form_values())
+        self._select_saved_record(self.current_records[-1])
+
+    def _update_record(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        record = self.displayed_records[int(selection[0])]
+        record_index = self.current_records.index(record)
+        self.store.update_record(
+            self.current_section, record, self._form_values()
+        )
+        self._select_saved_record(self.current_records[record_index])
+
     def on_save(self):
         if self._adding_record:
-            fields = SECTIONS[self.current_section]["fields"]
-            auto_fields = SECTIONS[self.current_section]["auto"]
-            values = {
-                field: self._field_value(field)
-                for field in fields
-                if field not in auto_fields
-            }
-            self.store.add_record(self.current_section, values)
-            record = self.current_records[-1]
-            self._populate_list(self.current_records)
-            index = next(
-                index
-                for index, displayed in enumerate(self.displayed_records)
-                if displayed is record
-            )
-            self.tree.selection_set(str(index))
-            self.tree.focus(str(index))
-            self._show_record(record)
-            return
-
-        self._set_editing(False)
+            self._add_record()
+        else:
+            self._update_record()
 
     def on_cancel(self):
         """Discard edits and return to view mode."""

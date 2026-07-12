@@ -37,3 +37,8 @@ class RecordStore:
     def delete_record(self, section, record):
         self.records[section].remove(record)
         self.save_collection(section)
+
+    def update_record(self, section, record, fields):
+        record_index = self.records[section].index(record)
+        self.records[section][record_index].update(fields)
+        self.save_collection(section)
