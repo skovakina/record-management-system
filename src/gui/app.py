@@ -103,6 +103,20 @@ def _section_label(section):
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
 
 
+class AutoScrollbar(ttk.Scrollbar):
+    """A ttk.Scrollbar that hides itself via grid when its content fits.
+
+    Requires the caller to place/manage it with grid (uses grid_remove/grid).
+    """
+
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            self.grid_remove()
+        else:
+            self.grid()
+        super().set(lo, hi)
+
+
 class DateTimeField(ttk.Frame):
     """A composite Date (Y/M/D dropdowns) + Time (HH:MM) field.
 
@@ -451,10 +465,10 @@ class RecordManagerApp(tk.Tk):
         list_wrap.columnconfigure(0, weight=1)
 
         self.tree = ttk.Treeview(list_wrap, show="headings", selectmode="browse")
-        vscroll = ttk.Scrollbar(
+        vscroll = AutoScrollbar(
             list_wrap, orient="vertical", command=self.tree.yview
         )
-        hscroll = ttk.Scrollbar(
+        hscroll = AutoScrollbar(
             list_wrap, orient="horizontal", command=self.tree.xview
         )
         self.tree.configure(yscrollcommand=vscroll.set, xscrollcommand=hscroll.set)
