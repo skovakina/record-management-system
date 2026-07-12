@@ -799,9 +799,10 @@ class RecordManagerApp(tk.Tk):
         sortable = SECTIONS[self.current_section].get("sortable", False)
         rows = self._sorted(records) if sortable else list(records)
 
+        references = SECTIONS[self.current_section].get("references", {})
         self.tree["columns"] = fields
         for field in fields:
-            label = _label_for(field)
+            label = references[field]["label"] if field in references else _label_for(field)
             if sortable:
                 if field == self.sort_field:
                     arrow = SORT_ASCENDING if self.sort_ascending else SORT_DESCENDING
