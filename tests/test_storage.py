@@ -90,11 +90,13 @@ class TestStorageLoading(unittest.TestCase):
         store = RecordStore(self.paths)
         collection_refs = dict(store.records)
 
-        client = store.add_record("clients", {"name": "Maya Brooks"})
-        airline = store.add_record(
+        store.add_record("clients", {"name": "Maya Brooks"})
+        client = store.records["clients"][-1]
+        store.add_record(
             "airlines", {"company_name": "Sky Air"}
         )
-        flight = store.add_record(
+        airline = store.records["airlines"][-1]
+        store.add_record(
             "flights",
             {
                 "client_id": client["id"],
@@ -104,6 +106,7 @@ class TestStorageLoading(unittest.TestCase):
                 "end_city": "Denver",
             },
         )
+        flight = store.records["flights"][-1]
 
         self.assertEqual(store.records["clients"][0], client)
         self.assertEqual(store.records["airlines"][0], airline)

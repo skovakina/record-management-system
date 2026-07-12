@@ -994,7 +994,8 @@ class RecordManagerApp(tk.Tk):
                 for field in fields
                 if field not in auto_fields
             }
-            record = self.store.add_record(self.current_section, values)
+            self.store.add_record(self.current_section, values)
+            record = self.current_records[-1]
             self._populate_list(self.current_records)
             index = next(
                 index

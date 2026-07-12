@@ -31,7 +31,5 @@ class RecordStore:
     def add_record(self, section, fields):
         record_class = RECORD_CLASSES.get(section)
         record = record_class(**fields).to_dict()
-        record_index = len(self.records[section])
         self.records[section].append(record)
         self.save_records(section)
-        return self.records[section][record_index]
