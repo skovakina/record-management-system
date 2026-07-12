@@ -1,15 +1,37 @@
 # Final Application Test Plan
 
-This document is intended as a manual testing checklist for the integrated application. It complements the unit tests by verifying end-to-end behaviour from a user's perspective.
+This Test Plan defines the testing strategy, scope, responsibilities, environment, and test cases for the Record Management System developed for a specialist travel agent. 
+The system manages three record types:
+Client Records
+Airline Records
+Flight Records
+The purpose of this Test Plan is to ensure the system behaves correctly, reliably, and consistently across all required operations: Create, Search, Update, Delete, and Persist.
 
 ---
+##Testers
+
+- Khanh Ngoc Nguyen (MAC Operating System)
+- Victor Mekwunye (Windows Operating System)
+
+##Responsibilities
+Execute all test cases
+
+Log defects in GitHub Issues
+
+Verify fixes
+
+Perform regression testing
+
+
+Maintain test documentation
+
 
 ## 1. Application Startup
 
 - [ ] Application launches successfully.
 - [ ] No exceptions are raised on startup.
 - [ ] Existing records are loaded correctly.
-- [ ] Empty data files are handled without crashing.
+- [ ] Missing or Empty data files are handled without crashing.
 
 ---
 
@@ -18,11 +40,14 @@ This document is intended as a manual testing checklist for the integrated appli
 ### Create
 - [ ] Create a new client.
 - [ ] Client appears in the list immediately.
-- [ ] A unique UUID is generated automatically.
+- [ ] A unique Integer ID is generated automatically.
+- [ ] Validation prevents missing fields.
+- [ ] Validation prevents invalid data types.
 
 ### Search
 - [ ] Search returns the correct client.
 - [ ] Searching for a non-existent client returns no results.
+- [ ] Search handles empty database
 
 ### Update
 - [ ] Update client details successfully.
@@ -33,6 +58,7 @@ This document is intended as a manual testing checklist for the integrated appli
 - [ ] Delete the selected client.
 - [ ] Client is removed from the list.
 - [ ] No other records are affected.
+- [ ] Deleting non-existent ID handled gracefully.
 
 ---
 
@@ -41,7 +67,7 @@ This document is intended as a manual testing checklist for the integrated appli
 ### Create
 - [ ] Create a new airline.
 - [ ] Airline appears in the list.
-- [ ] A unique UUID is generated automatically.
+- [ ] A unique Integer ID is generated automatically.
 
 ### Search
 - [ ] Search returns the correct airline.
@@ -50,7 +76,7 @@ This document is intended as a manual testing checklist for the integrated appli
 ### Update
 - [ ] Update airline details successfully.
 - [ ] Only the selected airline is modified.
-- [ ] Airline UUID remains unchanged.
+- [ ] Airline unique Integer ID remains unchanged.
 
 ### Delete
 - [ ] Delete the selected airline.
@@ -63,9 +89,10 @@ This document is intended as a manual testing checklist for the integrated appli
 
 ### Create
 - [ ] Create a new flight.
-- [ ] Client and Airline dropdowns display available records.
+- [ ] Client dropdowns display available records.
+- [ ] Airline dropdowns display available records.
 - [ ] Flight appears in the list.
-- [ ] A unique UUID is generated automatically.
+- [ ] A unique Integer ID is generated automatically.
 
 ### Search
 - [ ] Search returns the correct flight.
@@ -74,7 +101,7 @@ This document is intended as a manual testing checklist for the integrated appli
 ### Update
 - [ ] Update flight details successfully.
 - [ ] Only the selected flight is modified.
-- [ ] Flight UUID remains unchanged.
+- [ ] Flight unique Integer ID remains unchanged.
 
 ### Delete
 - [ ] Delete the selected flight.
@@ -88,9 +115,10 @@ This document is intended as a manual testing checklist for the integrated appli
 - [ ] Save changes.
 - [ ] Close the application.
 - [ ] Reopen the application.
-- [ ] Previously created records are still present.
-- [ ] Updated records remain updated.
+- [ ] Created records persist.
+- [ ] Updated records persist.
 - [ ] Deleted records remain deleted.
+- [ ] File format remains valid
 
 ---
 
@@ -103,11 +131,19 @@ This document is intended as a manual testing checklist for the integrated appli
 - [ ] The application closes without errors.
 
 ---
+## 7. Negative Test 
+- [ ] Create record with missing fields.
+- [ ] Create record with invalid data types.
+- [ ] Duplicate ID creation.
+- [ ] Update non-existent record.
+- [ ] Delete non-existent record.
+- [ ] Search with invalid input.
+- [ ] Enter extremely long strings.
+- [ ] Invalid date formats.
 
-## 7. Regression Test
+## 8. Regression Test
 
 Verify the complete workflow:
-
 - [ ] Create Client
 - [ ] Create Airline
 - [ ] Create Flight
@@ -129,5 +165,7 @@ Verify the complete workflow:
 | Airline | ☐ Pass ☐ Fail | |
 | Flight | ☐ Pass ☐ Fail | |
 | Persistence | ☐ Pass ☐ Fail | |
+| GUI | ☐ Pass ☐ Fail | |
+| Regression | ☐ Pass ☐ Fail | |
 | GUI | ☐ Pass ☐ Fail | |
 | Regression | ☐ Pass ☐ Fail | |
