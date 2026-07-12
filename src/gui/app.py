@@ -828,7 +828,12 @@ class RecordManagerApp(tk.Tk):
 
         self.tree.delete(*self.tree.get_children())
         for index, record in enumerate(rows):
-            values = [record.get(f, "") for f in fields]
+            values = [
+                self.ref_index[f]["to_display"].get(record.get(f), record.get(f, ""))
+                if f in self.ref_index
+                else record.get(f, "")
+                for f in fields
+            ]
             self.tree.insert("", "end", iid=str(index), values=values)
         self.displayed_records = rows
 
