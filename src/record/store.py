@@ -33,3 +33,7 @@ class RecordStore:
         record = record_class(**fields).to_dict()
         self.records[section].append(record)
         self.save_records(section)
+
+    def delete_record(self, section, record):
+        self.records[section].remove(record)
+        self.save_records(section)

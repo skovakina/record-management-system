@@ -126,6 +126,25 @@ class TestStorageLoading(unittest.TestCase):
         self.assertFalse(os.path.exists(self.paths["airlines"]))
         self.assertFalse(os.path.exists(self.paths["flights"]))
 
+    def test_store_deletes_record_and_persists_collection(self):
+        store = RecordStore(self.paths)
+        collection = store.records["clients"]
+        store.add_record("clients", {"name": "Maya Brooks"})
+        store.add_record("clients", {"name": "Noah Patel"})
+        deleted = store.records["clients"][0]
+
+        store.delete_record("clients", deleted)
+
+        self.assertIs(store.records["clients"], collection)
+        self.assertEqual(
+            [record["name"] for record in store.records["clients"]],
+            ["Noah Patel"],
+        )
+        self.assertEqual(
+            storage.load_records(self.paths["clients"]),
+            store.records["clients"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

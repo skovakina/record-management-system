@@ -935,7 +935,6 @@ class RecordManagerApp(tk.Tk):
         """Delete the currently shown record (View mode only), with confirmation.
 
         Blocks deletion of a Client/Airline still referenced by a Flight.
-        TODO: persist the deletion through RecordStore (#7/#8).
         """
         if not self._record_shown:
             return
@@ -960,9 +959,7 @@ class RecordManagerApp(tk.Tk):
         ):
             return
 
-        records = self.section_records[self.current_section]
-        if record in records:
-            records.remove(record)
+        self.store.delete_record(self.current_section, record)
         self.tree.selection_remove(selection)
         self._populate_list(self.current_records)
         self._show_record(None)
