@@ -324,6 +324,7 @@ class RecordManagerApp(tk.Tk):
         self._search_hint = ""
         self._placeholder_active = False
         self.editing = False
+        self._adding_record = False
 
         self._build_body()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -626,6 +627,7 @@ class RecordManagerApp(tk.Tk):
         Reference fields translate the stored ID to its display name.
         """
         self._record_shown = record is not None
+        self._adding_record = False
         for field, (widget, var, _) in self.detail_entries.items():
             if record is None:
                 var.set("")
@@ -933,7 +935,6 @@ class RecordManagerApp(tk.Tk):
         """Delete the currently shown record (View mode only), with confirmation.
 
         Blocks deletion of a Client/Airline still referenced by a Flight.
-        TODO: persist the deletion through RecordStore (#7/#8).
         """
         if not self._record_shown:
             return
@@ -958,9 +959,7 @@ class RecordManagerApp(tk.Tk):
         ):
             return
 
-        records = self.section_records[self.current_section]
-        if record in records:
-            records.remove(record)
+        self.store.delete_record(self.current_section, record)
         self.tree.selection_remove(selection)
         self._populate_list(self.current_records)
         self._show_record(None)
@@ -983,14 +982,46 @@ class RecordManagerApp(tk.Tk):
             return self.ref_index[field]["to_id"].get(value)
         return value
 
-    def on_save(self):
-        """Exit edit mode (Save is only clickable once required fields are valid).
+    def _form_values(self):
+        fields = SECTIONS[self.current_section]["fields"]
+        auto_fields = SECTIONS[self.current_section]["auto"]
+        return {
+            field: self._field_value(field)
+            for field in fields
+            if field not in auto_fields
+        }
 
-        TODO: wire to the data layer -- build the record via
-        ``{f: self._field_value(f) for f in fields}`` and persist through
-        RecordStore. Nothing is written to disk yet.
-        """
-        self._set_editing(False)
+    def _select_saved_record(self, record):
+        self._populate_list(self.current_records)
+        index = next(
+            index
+            for index, displayed in enumerate(self.displayed_records)
+            if displayed is record
+        )
+        self.tree.selection_set(str(index))
+        self.tree.focus(str(index))
+        self._show_record(record)
+
+    def _add_record(self):
+        self.store.add_record(self.current_section, self._form_values())
+        self._select_saved_record(self.current_records[-1])
+
+    def _update_record(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        record = self.displayed_records[int(selection[0])]
+        record_index = self.current_records.index(record)
+        self.store.update_record(
+            self.current_section, record, self._form_values()
+        )
+        self._select_saved_record(self.current_records[record_index])
+
+    def on_save(self):
+        if self._adding_record:
+            self._add_record()
+        else:
+            self._update_record()
 
     def on_cancel(self):
         """Discard edits and return to view mode."""
@@ -998,33 +1029,17 @@ class RecordManagerApp(tk.Tk):
         record = self.displayed_records[int(selection[0])] if selection else None
         self._show_record(record)
 
-    def _next_id(self):
-        """Return the next auto-assigned ID (one past the highest, or 0)."""
-        ids = [
-            r["id"]
-            for r in self.current_records
-            if isinstance(r.get("id"), int)
-        ]
-        return max(ids) + 1 if ids else 0
-
     def on_new(self):
-        """Open a blank, editable record; ID is pre-filled and read-only.
-
-        TODO: wire to the data layer -- on save, create the record via the
-        section's factory (which sets the record's type) and add it to the
-        shared store.
-        """
+        """Open a blank form"""
         self.tree.selection_remove(self.tree.selection())
         self._show_record(None)
-        if "id" in self.detail_entries:
-            self.detail_entries["id"][1].set(str(self._next_id()))
+        self._adding_record = True
         self._set_editing(True)
 
     def on_close(self):
         """Close the window.
 
         TODO: wire to the data layer -- call RecordStore.save() here so the
-        records are written to JSONL on exit.
+        records are written to JSON on exit.
         """
-        # save_records()  # <- to be connected to the store
         self.destroy()

@@ -25,7 +25,7 @@ def load_records(path):
         return json.load(file)
 
 
-def save_records(records, path):
+def write_collection(records, path):
     with open(path, "w", encoding="utf-8") as file:
         json.dump(records, file, indent=2)
 
@@ -39,6 +39,6 @@ def load_collections(paths=COLLECTION_PATHS):
 
 
 def save_collections(collections, paths=COLLECTION_PATHS):
-    save_records(collections["clients"], paths["clients"])
-    save_records(collections["airlines"], paths["airlines"])
-    save_records(collections["flights"], paths["flights"])
+    write_collection(collections["clients"], paths["clients"])
+    write_collection(collections["airlines"], paths["airlines"])
+    write_collection(collections["flights"], paths["flights"])
