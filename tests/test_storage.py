@@ -75,9 +75,9 @@ class TestStorageLoading(unittest.TestCase):
     def test_default_dummy_data_loads(self):
         collections = RecordStore().load_records()
 
-        self.assertEqual(len(collections["clients"]), 3)
-        self.assertEqual(len(collections["airlines"]), 3)
-        self.assertEqual(len(collections["flights"]), 3)
+        self.assertGreaterEqual(len(collections["clients"]), 3)
+        self.assertGreaterEqual(len(collections["airlines"]), 3)
+        self.assertGreaterEqual(len(collections["flights"]), 3)
         self.assertEqual(collections["clients"][0]["name"], "Maya Brooks")
 
         client_ids = {client["id"] for client in collections["clients"]}
@@ -85,6 +85,43 @@ class TestStorageLoading(unittest.TestCase):
         for flight in collections["flights"]:
             self.assertIn(flight["client_id"], client_ids)
             self.assertIn(flight["airline_id"], airline_ids)
+
+    def test_store_adds_each_record_type_to_its_collection(self):
+        store = RecordStore(self.paths)
+        collection_refs = dict(store.records)
+
+        client = store.add_record("clients", {"name": "Maya Brooks"})
+        airline = store.add_record(
+            "airlines", {"company_name": "Sky Air"}
+        )
+        flight = store.add_record(
+            "flights",
+            {
+                "client_id": client["id"],
+                "airline_id": airline["id"],
+                "date": "2026-08-15T09:30",
+                "start_city": "Seattle",
+                "end_city": "Denver",
+            },
+        )
+
+        self.assertEqual(store.records["clients"][0], client)
+        self.assertEqual(store.records["airlines"][0], airline)
+        self.assertEqual(store.records["flights"][0], flight)
+        for section, collection in collection_refs.items():
+            self.assertIs(store.records[section], collection)
+
+        reloaded = RecordStore(self.paths).load_records()
+        self.assertEqual(reloaded, store.records)
+
+    def test_add_record_writes_only_changed_collection(self):
+        store = RecordStore(self.paths)
+
+        store.add_record("clients", {"name": "Maya Brooks"})
+
+        self.assertTrue(os.path.exists(self.paths["clients"]))
+        self.assertFalse(os.path.exists(self.paths["airlines"]))
+        self.assertFalse(os.path.exists(self.paths["flights"]))
 
 
 if __name__ == "__main__":

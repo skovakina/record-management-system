@@ -5,6 +5,12 @@ from record.airline import Airline
 from record.client import Client
 from record.flight import Flight
 
+RECORD_CLASSES = {
+    "clients": Client,
+    "airlines": Airline,
+    "flights": Flight,
+}
+
 
 class RecordStore:
     def __init__(self, collection_paths=storage.COLLECTION_PATHS):
@@ -12,23 +18,20 @@ class RecordStore:
         self.records = {name: [] for name in storage.COLLECTION_TYPES}
 
     def load_records(self):
-        self.records = storage.load_collections(self.collection_paths)
+        loaded = storage.load_collections(self.collection_paths)
+        for section in storage.COLLECTION_TYPES:
+            self.records[section][:] = loaded[section]
         return self.records
 
-    def save_records(self):
-        storage.save_collections(self.records, self.collection_paths)
+    def save_records(self, section):
+        path = self.collection_paths[section]
+        storage.save_records(self.records[section], path)
+        self.records[section][:] = storage.load_records(path)
 
-    def add_client_record(self, name, **fields):
-        record = Client(name, **fields).to_dict()
-        self.records["clients"].append(record)
-        return record
-
-    def add_airline_record(self, company_name):
-        record = Airline(company_name).to_dict()
-        self.records["airlines"].append(record)
-        return record
-
-    def add_flight_record(self, client_id, airline_id, date, start_city, end_city):
-        record = Flight(client_id, airline_id, date, start_city, end_city).to_dict()
-        self.records["flights"].append(record)
-        return record
+    def add_record(self, section, fields):
+        record_class = RECORD_CLASSES.get(section)
+        record = record_class(**fields).to_dict()
+        record_index = len(self.records[section])
+        self.records[section].append(record)
+        self.save_records(section)
+        return self.records[section][record_index]
