@@ -1016,7 +1016,7 @@ class RecordManagerApp(tk.Tk):
         self._show_record(record)
 
     def on_new(self):
-        """Open a blank form; the store generates any ID when it is saved."""
+        """Open a blank form"""
         self.tree.selection_remove(self.tree.selection())
         self._show_record(None)
         self._adding_record = True
