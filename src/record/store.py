@@ -23,17 +23,17 @@ class RecordStore:
             self.records[section][:] = loaded[section]
         return self.records
 
-    def save_records(self, section):
+    def save_collection(self, section):
         path = self.collection_paths[section]
-        storage.save_records(self.records[section], path)
+        storage.write_collection(self.records[section], path)
         self.records[section][:] = storage.load_records(path)
 
     def add_record(self, section, fields):
         record_class = RECORD_CLASSES.get(section)
         record = record_class(**fields).to_dict()
         self.records[section].append(record)
-        self.save_records(section)
+        self.save_collection(section)
 
     def delete_record(self, section, record):
         self.records[section].remove(record)
-        self.save_records(section)
+        self.save_collection(section)
