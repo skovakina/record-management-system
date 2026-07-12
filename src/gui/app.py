@@ -447,13 +447,21 @@ class RecordManagerApp(tk.Tk):
         # section in _populate_list.
         list_wrap = ttk.Frame(middle)
         list_wrap.pack(side="top", fill="both", expand=True)
+        list_wrap.rowconfigure(0, weight=1)
+        list_wrap.columnconfigure(0, weight=1)
+
         self.tree = ttk.Treeview(list_wrap, show="headings", selectmode="browse")
-        scroll = ttk.Scrollbar(
+        vscroll = ttk.Scrollbar(
             list_wrap, orient="vertical", command=self.tree.yview
         )
-        self.tree.configure(yscrollcommand=scroll.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
+        hscroll = ttk.Scrollbar(
+            list_wrap, orient="horizontal", command=self.tree.xview
+        )
+        self.tree.configure(yscrollcommand=vscroll.set, xscrollcommand=hscroll.set)
+
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vscroll.grid(row=0, column=1, sticky="ns")
+        hscroll.grid(row=1, column=0, sticky="ew")
         self.tree.bind("<<TreeviewSelect>>", self.on_select_entry)
 
     def _build_detail_panel(self, parent):
