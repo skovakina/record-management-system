@@ -103,6 +103,20 @@ def _section_label(section):
 COLUMN_WEIGHTS = {"sidebar": 20, "list": 38, "detail": 42}
 
 
+class AutoScrollbar(ttk.Scrollbar):
+    """A ttk.Scrollbar that hides itself via grid when its content fits.
+
+    Requires the caller to place/manage it with grid (uses grid_remove/grid).
+    """
+
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            self.grid_remove()
+        else:
+            self.grid()
+        super().set(lo, hi)
+
+
 class DateTimeField(ttk.Frame):
     """A composite Date (Y/M/D dropdowns) + Time (HH:MM) field.
 
@@ -447,13 +461,21 @@ class RecordManagerApp(tk.Tk):
         # section in _populate_list.
         list_wrap = ttk.Frame(middle)
         list_wrap.pack(side="top", fill="both", expand=True)
+        list_wrap.rowconfigure(0, weight=1)
+        list_wrap.columnconfigure(0, weight=1)
+
         self.tree = ttk.Treeview(list_wrap, show="headings", selectmode="browse")
-        scroll = ttk.Scrollbar(
+        vscroll = AutoScrollbar(
             list_wrap, orient="vertical", command=self.tree.yview
         )
-        self.tree.configure(yscrollcommand=scroll.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
+        hscroll = AutoScrollbar(
+            list_wrap, orient="horizontal", command=self.tree.xview
+        )
+        self.tree.configure(yscrollcommand=vscroll.set, xscrollcommand=hscroll.set)
+
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vscroll.grid(row=0, column=1, sticky="ns")
+        hscroll.grid(row=1, column=0, sticky="ew")
         self.tree.bind("<<TreeviewSelect>>", self.on_select_entry)
 
     def _build_detail_panel(self, parent):
@@ -791,9 +813,10 @@ class RecordManagerApp(tk.Tk):
         sortable = SECTIONS[self.current_section].get("sortable", False)
         rows = self._sorted(records) if sortable else list(records)
 
+        references = SECTIONS[self.current_section].get("references", {})
         self.tree["columns"] = fields
         for field in fields:
-            label = _label_for(field)
+            label = references[field]["label"] if field in references else _label_for(field)
             if sortable:
                 if field == self.sort_field:
                     arrow = SORT_ASCENDING if self.sort_ascending else SORT_DESCENDING
@@ -820,7 +843,12 @@ class RecordManagerApp(tk.Tk):
 
         self.tree.delete(*self.tree.get_children())
         for index, record in enumerate(rows):
-            values = [record.get(f, "") for f in fields]
+            values = [
+                self.ref_index[f]["to_display"].get(record.get(f), record.get(f, ""))
+                if f in self.ref_index
+                else record.get(f, "")
+                for f in fields
+            ]
             self.tree.insert("", "end", iid=str(index), values=values)
         self.displayed_records = rows
 
