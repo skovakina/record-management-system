@@ -3,6 +3,7 @@ import sys
 import unittest
 import tkinter as tk
 
+HEADLESS = os.environ.get("DISPLAY") is None and os.name != "nt"
 # Make src importable when running "python -m unittest" from the repo root.
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), os.pardir, "src")
@@ -42,7 +43,8 @@ class TestAppPureFunctions(unittest.TestCase):
         self.assertEqual(app._section_label("airlines"), "Airlines")
 
 
-class TestReferenceIndex(unittest.TestCase):
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
+class TestRecordDisplay(unittest.TestCase):
     def test_build_ref_index(self):
         instance = app.RecordManagerApp(DummyStore())
         instance._build_ref_index("flights")
@@ -69,6 +71,7 @@ class TestRecordDisplay(unittest.TestCase):
         self.assertEqual(instance.detail_entries["city"][1].get(), "London")
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestRequiredValidation(unittest.TestCase):
     def test_validate_required_flags_missing_fields(self):
         store = DummyStore()
@@ -87,6 +90,7 @@ class TestRequiredValidation(unittest.TestCase):
 
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestFieldState(unittest.TestCase):
     def test_field_state_logic(self):
         store = DummyStore()
@@ -98,6 +102,7 @@ class TestFieldState(unittest.TestCase):
         self.assertEqual(instance._field_state("name", editing=False), "readonly")
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestSorting(unittest.TestCase):
     def test_sorting_logic(self):
         store = DummyStore()
@@ -115,6 +120,7 @@ class TestSorting(unittest.TestCase):
         self.assertEqual(sorted_records_desc[0]["name"], "Bob")
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestSearchScheduling(unittest.TestCase):
     def test_search_scheduling(self):
         store = DummyStore()
@@ -128,6 +134,7 @@ class TestSearchScheduling(unittest.TestCase):
         self.assertIsNotNone(instance._search_job)
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestSectionSwitching(unittest.TestCase):
     def test_section_switching(self):
         store = DummyStore()
@@ -140,6 +147,7 @@ class TestSectionSwitching(unittest.TestCase):
         self.assertEqual(instance.current_section, "airlines")
 
 
+@unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestDateTimeField(unittest.TestCase):
     def test_datetime_field_get_set(self):
         root = tk.Tk()
