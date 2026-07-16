@@ -3,7 +3,7 @@ import sys
 import unittest
 import tkinter as tk
 
-HEADLESS = os.environ.get("DISPLAY") is None and os.name != "nt"
+HEADLESS = os.name != "nt" and not os.environ.get("DISPLAY")
 # Make src importable when running "python -m unittest" from the repo root.
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), os.pardir, "src")
@@ -44,17 +44,18 @@ class TestAppPureFunctions(unittest.TestCase):
 
 
 @unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
-class TestRecordDisplay(unittest.TestCase):
-    def test_build_ref_index(self):
-        instance = app.RecordManagerApp(DummyStore())
-        instance._build_ref_index("flights")
+class TestRecordDisplayValues(unittest.TestCase):
+    def test_show_record_sets_values(self):
+        store = DummyStore()
+        instance = app.RecordManagerApp(store)
+        instance.current_section = "clients"
+        instance._render_fields("clients")
 
-        client_map = instance.ref_index["client_id"]
-        self.assertEqual(client_map["to_id"]["Alice"], 1)
-        self.assertEqual(client_map["to_display"][1], "Alice")
+        record = {"id": 1, "name": "Alice", "city": "London"}
+        instance._show_record(record)
 
-        airline_map = instance.ref_index["airline_id"]
-        self.assertEqual(airline_map["to_id"]["SkyJet"], 10)
+        self.assertEqual(instance.detail_entries["name"][1].get(), "Alice")
+        self.assertEqual(instance.detail_entries["city"][1].get(), "London")
 
 
 class TestRecordDisplay(unittest.TestCase):
