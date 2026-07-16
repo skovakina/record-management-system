@@ -58,19 +58,6 @@ class TestRecordDisplayValues(unittest.TestCase):
         self.assertEqual(instance.detail_entries["city"][1].get(), "London")
 
 
-class TestRecordDisplay(unittest.TestCase):
-    def test_show_record_sets_values(self):
-        store = DummyStore()
-        instance = app.RecordManagerApp(store)
-        instance.current_section = "clients"
-        instance._render_fields("clients")
-
-        record = {"id": 1, "name": "Alice", "city": "London"}
-        instance._show_record(record)
-
-        self.assertEqual(instance.detail_entries["name"][1].get(), "Alice")
-        self.assertEqual(instance.detail_entries["city"][1].get(), "London")
-
 
 @unittest.skipIf(HEADLESS, "Tkinter GUI tests require a display")
 class TestRequiredValidation(unittest.TestCase):
