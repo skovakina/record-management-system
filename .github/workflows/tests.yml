@@ -18,6 +18,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb python3-tk
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-custom_exit_code
 
@@ -25,4 +27,4 @@ jobs:
         run: python -m compileall -q src tests
 
       - name: Run tests
-        run: python -m pytest --suppress-no-test-exit-code
+        run: xvfb-run -a python -m pytest --suppress-no-test-exit-code
