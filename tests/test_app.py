@@ -11,19 +11,41 @@ sys.path.insert(
 import gui.app as app
 
 
-class DummyStore:
+class TestStore:
     SAMPLE_RECORDS = {
         "clients": [
-            {"id": 1, "name": "Alice", "city": "London"},
-            {"id": 2, "name": "Bob", "city": "Paris"},
+            {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "name": "Alice",
+                "city": "London",
+            },
+            {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "name": "Bob",
+                "city": "Paris",
+            },
         ],
         "airlines": [
-            {"id": 10, "company_name": "SkyJet"},
-            {"id": 11, "company_name": "AirWorld"},
+            {
+                "id": "33333333-3333-4333-8333-333333333333",
+                "company_name": "SkyJet",
+            },
+            {
+                "id": "44444444-4444-4444-8444-444444444444",
+                "company_name": "AirWorld",
+            },
         ],
         "flights": [
-            {"client_id": 1, "airline_id": 10, "date": "2025-01-01T10:00"},
-            {"client_id": 2, "airline_id": 11, "date": "2025-01-02T12:00"},
+            {
+                "client_id": "11111111-1111-4111-8111-111111111111",
+                "airline_id": "33333333-3333-4333-8333-333333333333",
+                "date": "2025-01-01T10:00",
+            },
+            {
+                "client_id": "22222222-2222-4222-8222-222222222222",
+                "airline_id": "44444444-4444-4444-8444-444444444444",
+                "date": "2025-01-02T12:00",
+            },
         ]
     }
 
@@ -54,13 +76,17 @@ class TestAppPureFunctions(unittest.TestCase):
 
 class TestRecordDisplayValues(unittest.TestCase):
     def test_show_record_sets_values(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
             instance._render_fields("clients")
 
-            record = {"id": 1, "name": "Alice", "city": "London"}
+            record = {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "name": "Alice",
+                "city": "London",
+            }
             instance._show_record(record)
 
             self.assertEqual(instance.detail_entries["name"][1].get(), "Alice")
@@ -69,7 +95,7 @@ class TestRecordDisplayValues(unittest.TestCase):
             instance.destroy()
 
     def test_show_flight_record_uses_reference_display_names(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "flights"
@@ -88,7 +114,7 @@ class TestRecordDisplayValues(unittest.TestCase):
 
 class TestRequiredValidation(unittest.TestCase):
     def test_validate_required_flags_missing_fields(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
@@ -110,7 +136,7 @@ class TestRequiredValidation(unittest.TestCase):
 
 class TestFieldState(unittest.TestCase):
     def test_field_state_logic(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
@@ -122,7 +148,7 @@ class TestFieldState(unittest.TestCase):
             instance.destroy()
 
     def test_reference_field_state_logic(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "flights"
@@ -141,7 +167,7 @@ class TestFieldState(unittest.TestCase):
 
 class TestSorting(unittest.TestCase):
     def test_sorting_logic(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
@@ -159,7 +185,7 @@ class TestSorting(unittest.TestCase):
             instance.destroy()
 
     def test_on_sort_toggles_current_column(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.select_section("clients")
@@ -177,7 +203,7 @@ class TestSorting(unittest.TestCase):
 
 class TestSearchScheduling(unittest.TestCase):
     def test_search_scheduling(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
@@ -193,7 +219,7 @@ class TestSearchScheduling(unittest.TestCase):
             instance.destroy()
 
     def test_search_filters_flights_by_client_name(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.select_section("flights")
@@ -210,7 +236,7 @@ class TestSearchScheduling(unittest.TestCase):
 
 class TestSectionSwitching(unittest.TestCase):
     def test_section_switching(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.select_section("clients")
@@ -228,18 +254,26 @@ class TestSectionSwitching(unittest.TestCase):
 
 class TestReferencesAndFormValues(unittest.TestCase):
     def test_build_ref_index_maps_names_to_ids(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance._build_ref_index("flights")
 
-            self.assertEqual(instance.ref_index["client_id"]["to_id"]["Alice"], 1)
-            self.assertEqual(instance.ref_index["airline_id"]["to_display"][11], "AirWorld")
+            self.assertEqual(
+                instance.ref_index["client_id"]["to_id"]["Alice"],
+                "11111111-1111-4111-8111-111111111111",
+            )
+            self.assertEqual(
+                instance.ref_index["airline_id"]["to_display"][
+                    "44444444-4444-4444-8444-444444444444"
+                ],
+                "AirWorld",
+            )
         finally:
             instance.destroy()
 
     def test_form_values_converts_flight_dropdowns_to_ids(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "flights"
@@ -254,8 +288,8 @@ class TestReferencesAndFormValues(unittest.TestCase):
             self.assertEqual(
                 instance._form_values(),
                 {
-                    "client_id": 1,
-                    "airline_id": 11,
+                    "client_id": "11111111-1111-4111-8111-111111111111",
+                    "airline_id": "44444444-4444-4444-8444-444444444444",
                     "date": "2025-03-04T09:15",
                     "start_city": "London",
                     "end_city": "Paris",
@@ -265,7 +299,7 @@ class TestReferencesAndFormValues(unittest.TestCase):
             instance.destroy()
 
     def test_flight_dependents_finds_references(self):
-        store = DummyStore()
+        store = TestStore()
         instance = app.RecordManagerApp(store)
         try:
             instance.current_section = "clients"
