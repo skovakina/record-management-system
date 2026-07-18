@@ -8,7 +8,7 @@
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-2 .Install matching Python and Tkinter versions (macOS).
+2. Install matching Python and Tkinter versions (macOS).
 > Important: Use the same version for `python` and `python-tk`.
 
 ```bash
@@ -17,7 +17,7 @@ brew install python@3.14 python-tk@3.14
 
 ## Run the app
 
-From the project directory 
+From the project directory:
 
 ```bash
 $(brew --prefix)/bin/python3.14 -m venv --clear .venv
@@ -26,15 +26,28 @@ python -m pip install -r requirements.txt
 python src/main.py
 ```
 
-## Changelog
+## Run tests
 
-### Record IDs switched to UUID
+From the project directory:
 
-Record ids (`Client`, `Airline`, `Flight`) are now auto-generated `uuid4` strings instead of integers:
+Activate venv
 
-- Every record's `id` is generated automatically on creation (`str(uuid.uuid4())`)
-- `Flight` previously had no `id` field of its own; it now gets one, consistent with `Client` and `Airline`.
-- Since `Flight.client_id` and `Flight.airline_id` reference `Client.id` / `Airline.id`
+```bash
+source .venv/bin/activate
+```
 
+```bash
+python -m unittest
+```
 
-**Why UUID over alternatives:** other options considered were a utility function generating a random integer, or assigning ids based on list index. Those approaches can work for a simple project, but they're more prone to bugs — random integers need a uniqueness check to avoid collisions, and index-based ids shift or collide once records are deleted or reordered. Python's built-in `uuid4()` is a well-tested, standard-library solution that guarantees uniqueness, 
+Run one test file:
+
+```bash
+python -m unittest tests.test_app
+```
+
+Run tests with coverage:
+
+```bash
+python -m coverage run --source=src -m unittest && python -m coverage report -m
+```
