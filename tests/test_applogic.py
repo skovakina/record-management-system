@@ -13,22 +13,6 @@ import gui.app as app
 
 
 def _has_display():
-    """
-    Probe for a usable Tk display instead of guessing from os.name/DISPLAY.
-
-    The old check (`os.name != "nt" and not os.environ.get("DISPLAY")`) was
-    wrong on both platforms it tried to special-case:
-
-    - Windows never sets DISPLAY, so `os.name != "nt"` short-circuited the
-      check to False -> GUI tests always attempted to run, even headless CI.
-
-    - macOS doesn't use the DISPLAY env var for its native Tk backend, so the
-      check always evaluated to True -> GUI tests were always skipped, even
-      with a real display available.
-
-    Actually trying to create (and immediately destroy) a Tk root is the only
-    reliable cross-platform way to tell.
-    """
     try:
         root = tk.Tk()
         root.destroy()
@@ -40,8 +24,6 @@ def _has_display():
 HEADLESS = not _has_display()
 
 # UUIDs below follow the app's real schema (version-4 style strings)
-# rather than throwaway ints, so fixtures match what the app actually
-# stores/looks up.
 CLIENT_1_ID = "11111111-1111-4111-8111-111111111111"
 CLIENT_2_ID = "22222222-2222-4222-8222-222222222222"
 AIRLINE_1_ID = "33333333-3333-4333-8333-333333333333"
