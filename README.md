@@ -37,7 +37,7 @@ source .venv/bin/activate
 ```
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest
 ```
 
 Run one test file:
@@ -49,5 +49,5 @@ python -m unittest tests.test_app
 Run tests with coverage:
 
 ```bash
-python -m coverage run --source=src -m unittest discover -s tests && python -m coverage report -m
+python -m coverage run --source=src -m unittest && python -m coverage report -m
 ```
