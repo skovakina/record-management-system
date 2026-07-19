@@ -726,7 +726,12 @@ class RecordManagerApp(tk.Tk):
         # Ask the shared validator (record.validation) which fields are invalid;
         # the GUI only renders the result.
         data = {f: var.get() for f, (_, var, _) in self.detail_entries.items()}
-        errors = validation.validate(record_type, data)
+        exclude_id = None if self._adding_record else self._editing_record_id()
+        records = None
+        if record_type == "airline":
+            # Uniqueness needs the other records; store.records is keyed by section.
+            records = [r for section in self.store.records.values() for r in section]
+        errors = validation.validate(record_type, data, records, exclude_id)
         all_filled = True
         for field, (_, _, border) in self.detail_entries.items():
             invalid = field in errors
@@ -743,6 +748,13 @@ class RecordManagerApp(tk.Tk):
                 all_filled = False
 
         self.save_button.configure(state="normal" if all_filled else "disabled")
+
+    def _editing_record_id(self):
+        """ID of the record currently selected for editing, or None."""
+        selection = self.tree.selection()
+        if not selection:
+            return None
+        return self.displayed_records[int(selection[0])].get("id")
 
     def _clear_borders(self):
         """Reset field borders to normal and remove the '*' marks (view mode)."""
